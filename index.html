@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#101116">
+<title>WILDS FACE LAB</title>
+<style>
+:root{color-scheme:dark;--bg:#101116;--panel:#191b23;--panel2:#20232d;--line:#343846;--muted:#9ba2b3;--text:#f5f6fa;--accent:#b7f36b;--accent2:#d6ff9b}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 80% -10%,#30384a 0,transparent 34%),var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.wrap{max-width:760px;margin:auto;padding:24px 18px 56px}.top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:30px}.brand{font-size:12px;letter-spacing:.22em;color:var(--accent);font-weight:800}.version{font-size:11px;color:var(--muted);border:1px solid var(--line);padding:6px 9px;border-radius:99px}
+h1{font-size:clamp(30px,8vw,48px);line-height:1.03;letter-spacing:-.055em;margin:0 0 10px}.sub{color:var(--muted);font-size:14px;line-height:1.7;margin:0 0 25px}.eyebrow{font-size:11px;letter-spacing:.16em;color:var(--accent);font-weight:800;margin:0 0 10px}
+.card{background:linear-gradient(145deg,rgba(255,255,255,.045),transparent 55%),var(--panel);border:1px solid var(--line);border-radius:20px;padding:18px;margin:16px 0;box-shadow:0 12px 35px #0002}
+.card h2{font-size:17px;margin:0 0 15px}.row{display:flex;gap:10px;align-items:center}.seg{display:flex;background:#11131a;border:1px solid var(--line);padding:4px;border-radius:12px;flex:1}.seg button{flex:1}.btn{border:1px solid var(--line);background:var(--panel2);color:var(--text);padding:12px 14px;border-radius:11px;font-size:14px;font-weight:700;cursor:pointer}.btn.active,.btn.primary{background:var(--accent);color:#14170e;border-color:var(--accent)}.btn.ghost{background:transparent}
+.upload{border:1.5px dashed #596174;border-radius:16px;padding:20px;text-align:center;background:#12151d}.upload strong{display:block;margin:5px 0}.upload small{color:var(--muted)}input[type=file]{display:none}.preview{display:none;margin-top:14px;max-height:320px;width:100%;object-fit:contain;border-radius:12px;background:#0d0e13}
+.controls{display:grid;grid-template-columns:1fr;gap:16px}.control{padding-bottom:13px;border-bottom:1px solid #303440}.control:last-child{border:0;padding-bottom:0}.controltop{display:flex;justify-content:space-between;align-items:center;margin-bottom:9px;font-size:14px}.val{color:var(--accent);font-variant-numeric:tabular-nums;font-weight:800}
+input[type=range]{width:100%;accent-color:var(--accent)}.hint{color:var(--muted);font-size:12px;line-height:1.6}
+.result{display:grid;grid-template-columns:1fr 1fr;gap:10px}.metric{background:#12151d;border:1px solid var(--line);border-radius:13px;padding:13px}.metric span{display:block;color:var(--muted);font-size:11px;margin-bottom:6px}.metric strong{font-size:20px;color:var(--accent);font-variant-numeric:tabular-nums}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}.foot{color:#707789;text-align:center;font-size:11px;margin-top:26px;line-height:1.7}
+@media(min-width:620px){.controls{grid-template-columns:1fr 1fr}.wrap{padding-top:36px}.card{padding:22px}}
+</style>
+</head>
+<body>
+<main class="wrap">
+  <header class="top"><div class="brand">WILDS / FACE LAB</div><div class="version">PROTOTYPE v0.1</div></header>
+  <p class="eyebrow">FACE CONFIGURATION STUDIO</p>
+  <h1>Build your<br>face profile.</h1>
+  <p class="sub">写真を読み込み、各パラメータを調整して自分のフェイス設定を作成。<br>このバージョンは操作確認用のローカル試作版です。</p>
+
+  <section class="card">
+    <h2>01 / PROFILE</h2>
+    <div class="row">
+      <div class="seg">
+        <button class="btn active" id="male" type="button">MEN</button>
+        <button class="btn" id="female" type="button">WOMEN</button>
+      </div>
+      <button class="btn ghost" id="reset" type="button">RESET</button>
+    </div>
+    <p class="hint" id="profileHint" style="margin:12px 0 0">MEN profile selected</p>
+  </section>
+
+  <section class="card">
+    <h2>02 / FACE IMAGE</h2>
+    <label class="upload" for="photo">
+      <div style="font-size:27px">＋</div><strong>写真を選択</strong><small>JPG / PNG / HEIC（端末が対応する形式）</small>
+      <input id="photo" type="file" accept="image/*">
+    </label>
+    <img id="preview" class="preview" alt="選択した顔写真のプレビュー">
+    <p class="hint">写真はこの画面内でプレビューするだけで、サーバーには送信しません。</p>
+  </section>
+
+  <section class="card">
+    <h2>03 / FACE PARAMETERS</h2>
+    <div class="controls" id="controls"></div>
+  </section>
+
+  <section class="card">
+    <h2>04 / PROFILE OUTPUT</h2>
+    <div class="result" id="result"></div>
+    <div class="actions">
+      <button class="btn primary" id="copy" type="button">数値をコピー</button>
+      <button class="btn" id="save" type="button">JSONを保存</button>
+    </div>
+    <p class="hint" style="margin-bottom:0">表示される数値は手動調整用のサンプル値です。写真から顔を自動解析するAI機能はまだ搭載していません。</p>
+  </section>
+  <p class="foot">WILDS FACE LAB · Prototype<br>All adjustments are illustrative settings, not biometric measurements.</p>
+</main>
+<script>
+const definitions=[
+  {id:"outline",label:"輪郭 / Face outline",min:0,max:100,value:50},
+  {id:"eyes",label:"目の印象 / Eyes",min:0,max:100,value:50},
+  {id:"nose",label:"鼻の印象 / Nose",min:0,max:100,value:50},
+  {id:"mouth",label:"口の印象 / Mouth",min:0,max:100,value:50},
+  {id:"balance",label:"顔全体のバランス / Balance",min:0,max:100,value:50},
+  {id:"sharpness",label:"シャープさ / Sharpness",min:0,max:100,value:50}
+];
+let values=Object.fromEntries(definitions.map(x=>[x.id,x.value]));
+let gender="MEN";
+const controls=document.getElementById("controls"),result=document.getElementById("result");
+function render(){
+ controls.innerHTML=definitions.map(d=>`<div class="control"><div class="controltop"><label for="${d.id}">${d.label}</label><span class="val" id="${d.id}Val">${values[d.id]}</span></div><input id="${d.id}" type="range" min="${d.min}" max="${d.max}" value="${values[d.id]}" aria-label="${d.label}"></div>`).join("");
+ definitions.forEach(d=>document.getElementById(d.id).addEventListener("input",e=>{values[d.id]=Number(e.target.value);document.getElementById(d.id+"Val").textContent=values[d.id];renderResult()}));
+ renderResult();
+}
+function renderResult(){result.innerHTML=definitions.map(d=>`<div class="metric"><span>${d.label.split(" / ")[0]}</span><strong>${values[d.id]}</strong></div>`).join("")}
+function setGender(g){gender=g;document.getElementById("male").classList.toggle("active",g==="MEN");document.getElementById("female").classList.toggle("active",g==="WOMEN");document.getElementById("profileHint").textContent=g+" profile selected"}
+document.getElementById("male").onclick=()=>setGender("MEN");
+document.getElementById("female").onclick=()=>setGender("WOMEN");
+document.getElementById("reset").onclick=()=>{values=Object.fromEntries(definitions.map(x=>[x.id,x.value]));render()};
+document.getElementById("photo").addEventListener("change",e=>{const f=e.target.files[0];if(!f)return;const img=document.getElementById("preview");img.src=URL.createObjectURL(f);img.style.display="block"});
+function payload(){return {app:"WILDS FACE LAB",version:"0.1",profile:gender,parameters:values,note:"Sample manual settings; not AI facial analysis."}}
+document.getElementById("copy").onclick=async()=>{const text=JSON.stringify(payload(),null,2);try{await navigator.clipboard.writeText(text);alert("設定値をコピーしました")}catch(e){prompt("この内容をコピーしてください",text)}};
+document.getElementById("save").onclick=()=>{const blob=new Blob([JSON.stringify(payload(),null,2)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="wilds-face-lab-settings.json";a.click();URL.revokeObjectURL(a.href)};
+render();
+</script>
+</body>
+</html>
