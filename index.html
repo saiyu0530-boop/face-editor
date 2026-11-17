@@ -95,3 +95,154 @@ render();
 </script>
 </body>
 </html>
+
+
+<script type="module">
+
+import { FaceLandmarker, FilesetResolver }
+
+from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/+esm";
+
+const status = document.createElement("p");
+
+status.id = "aiStatus";
+
+status.style.cssText =
+
+"padding:12px;color:#65d6ad;font-size:14px";
+
+document.querySelector(".card:nth-of-type(2)")
+
+?.appendChild(status);
+
+async function analyzeFace(img) {
+
+  status.textContent = "AI顔分析を準備中...";
+
+  try {
+
+    const vision = await FilesetResolver.forVisionTasks(
+
+      "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm"
+
+    );
+
+    const detector = await FaceLandmarker.createFromOptions(
+
+      vision,
+
+      {
+
+        baseOptions: {
+
+          modelAssetPath:
+
+          "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
+
+          delegate: "CPU"
+
+        },
+
+        runningMode: "IMAGE",
+
+        numFaces: 1
+
+      }
+
+    );
+
+    const result = detector.detect(img);
+
+    if (!result.faceLandmarks.length) {
+
+      status.textContent = "顔を検出できません。正面写真を試してください。";
+
+      detector.close();
+
+      return;
+
+    }
+
+    const p = result.faceLandmarks[0];
+
+    const dist = (a,b) => Math.hypot(
+
+      p[a].x-p[b].x, p[a].y-p[b].y
+
+    );
+
+    const face = dist(234,454);
+
+    const height = dist(10,152);
+
+    const eye = (dist(33,133)+dist(362,263))/2;
+
+    const nose = dist(98,327);
+
+    const mouth = dist(61,291);
+
+    const jaw = dist(172,397);
+
+    const clamp = n => Math.max(0,Math.min(100,Math.round(n)));
+
+    const estimates = {
+
+      outline: clamp(50+(face/height-0.72)*100),
+
+      eyes: clamp(50+(eye/face-0.13)*300),
+
+      nose: clamp(50+(nose/face-0.16)*300),
+
+      mouth: clamp(50+(mouth/face-0.30)*250),
+
+      balance: clamp(50+(p[1].y-p[168].y)*100),
+
+      sharpness: clamp(50+(jaw/face-0.75)*150)
+
+    };
+
+    Object.entries(estimates).forEach(([id,value]) => {
+
+      const slider = document.getElementById(id);
+
+      if (slider) {
+
+        slider.value = value;
+
+        slider.dispatchEvent(new Event("input",{bubbles:true}));
+
+      }
+
+    });
+
+    status.textContent =
+
+      "顔の特徴を検出しました。6項目に参考値を反映しました。";
+
+    detector.close();
+
+  } catch (error) {
+
+    console.error(error);
+
+    status.textContent =
+
+      "分析に失敗しました。通信環境を確認してください。";
+
+  }
+
+}
+
+document.getElementById("photo").addEventListener("change", e => {
+
+  const file = e.target.files[0];
+
+  if (!file) return;
+
+  const img = document.getElementById("preview");
+
+  img.onload = () => analyzeFace(img);
+
+});
+
+</script>
