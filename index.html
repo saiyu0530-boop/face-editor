@@ -21,7 +21,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}.hint{color:var(--muted)
 </head>
 <body>
 <main class="wrap">
-  <header class="top"><div class="brand">WILDS / FACE LAB</div><div class="version">HAIR EDITOR v0.3</div></header>
+  <header class="top"><div class="brand">WILDS / FACE LAB</div><div class="version">HAIR EDITOR v0.3.2</div></header>
   <p class="eyebrow">FACE CONFIGURATION STUDIO</p>
   <h1>写真から<br>顔の特徴を測る。</h1>
   <p class="sub">顔写真から目・鼻・口・輪郭の位置関係を抽出する試験版です。ここで測定した特徴量を、次の段階でワイルズの実際の編集項目へ対応付けます。</p>
@@ -163,4 +163,26 @@ analyzeButton.addEventListener("click",async()=>{
    ["目の開き（目幅比）",pct(eyeOpen,eyeWidth)],
    ["左右の目の間隔（顔幅比）",pct(eyeGap,faceWidth)],
    ["鼻幅（顔幅比）",pct(noseWidth,faceWidth)],
-   ["鼻の長さ（顔高比）",pct(noseLength,
+   ["鼻の長さ（顔高比）",pct(noseLength,faceHeight)],
+   ["口幅（顔幅比）",pct(mouthWidth,faceWidth)],
+   ["唇の縦幅（口幅比）",pct(mouthHeight,mouthWidth)],
+   ["下顎幅（顔幅比）",pct(jawWidth,faceWidth)],
+   ["口元から顎先（顔高比）",pct(chinLength,faceHeight)]
+  ];
+  measuredMetrics=Object.fromEntries(metrics.map(([label,value])=>[label,Number(value.toFixed(2))]));
+  analysisResult.innerHTML=metrics.map(([label,value])=>metric(label,value)).join("");
+  analysisStatus.className="status ok";
+  analysisStatus.textContent="顔を検出しました。測定値は画像内のランドマーク比率です。ゲーム内スライダー値への変換はまだ行っていません。";
+ }catch(error){
+  analysisStatus.className="status error";
+  analysisStatus.textContent=error&&error.message?error.message:"解析中にエラーが発生しました。通信環境を確認して再試行してください。";
+ }finally{analyzeButton.disabled=false}
+});
+function payload(){return {app:"WILDS FACE LAB",version:"0.3.2-repaired",profile:gender,hair:{type:values.hairType,lengthSetting1:values.hairLength1,lengthSetting2:values.hairLength2},hairTypeObservedRange:"1–41 in uploaded video; maximum unverified",hairLengthRangeStatus:"0–10 provisional; verify in game",faceMeasurements:measuredMetrics,faceAnalysisStatus:measuredMetrics?"measured":"not_run",note:"Hair values are manually entered. Automatic hair recognition and mapping are not implemented."}}
+document.getElementById("copy").onclick=async()=>{const text=JSON.stringify(payload(),null,2);try{await navigator.clipboard.writeText(text);alert("設定メモをコピーしました")}catch(e){prompt("この内容をコピーしてください",text)}};
+document.getElementById("save").onclick=()=>{const blob=new Blob([JSON.stringify(payload(),null,2)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="wilds-hair-settings.json";a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)};
+window.addEventListener("beforeunload",()=>{if(selectedFileUrl)URL.revokeObjectURL(selectedFileUrl);if(faceLandmarker)faceLandmarker.close()});
+render();
+</script>
+</body>
+</html>
