@@ -23,7 +23,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}.hint{color:var(--muted)
 </head>
 <body>
 <main class="wrap">
-  <header class="top"><div class="brand">WILDS / FACE LAB</div><div class="version">HAIR EDITOR v0.4.2</div></header>
+  <header class="top"><div class="brand">WILDS / FACE LAB</div><div class="version">HAIR EDITOR v0.4.3</div></header>
   <p class="eyebrow">FACE CONFIGURATION STUDIO</p>
   <h1>写真から<br>顔の特徴を測る。</h1>
   <p class="sub">顔写真から目・鼻・口・輪郭の位置関係を抽出する試験版です。ここで測定した特徴量を、次の段階でワイルズの実際の編集項目へ対応付けます。</p>
@@ -80,6 +80,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}.hint{color:var(--muted)
       <div class="status" id="hairSuggestStatus" role="status" aria-live="polite">顔写真を選ぶと推定できます。</div>
       <button class="btn" id="applyHair" type="button" disabled>候補を設定に反映</button>
     </div>
+    <div id="hairCandidateList" class="selected-hair" style="text-align:left" hidden></div>
     <div class="type-grid" id="hairTypeGrid" role="group" aria-label="髪のタイプを番号で選択"></div>
     <div class="controls" id="controls"></div>
     <p class="hint">各項目の「− 1」「＋ 1」で1段階ずつ調整できます。男性の髪型番号への適用は未確認です。髪型の参考画像は正面に近い4種類のみです。写真からの髪型推定は実験段階です。色の設定は今回含めていません。</p>
@@ -108,6 +109,7 @@ let selectedFileUrl=null;
 let faceLandmarker=null;
 let measuredMetrics=null;
 let proposedHair=null;
+let candidateOptions=[];
 const controls=document.getElementById("controls"),result=document.getElementById("result");
 const preview=document.getElementById("preview");
 const analyzeButton=document.getElementById("analyze");
@@ -151,7 +153,7 @@ document.getElementById("photo").addEventListener("change",e=>{
  if(!f)return;
  if(selectedFileUrl)URL.revokeObjectURL(selectedFileUrl);
  selectedFileUrl=URL.createObjectURL(f);
- preview.onload=()=>{document.getElementById("suggestHair").disabled=false;document.getElementById("applyHair").disabled=true;proposedHair=null;document.getElementById("hairSuggestStatus").textContent="写真を読み込みました。推定できます。";analyzeButton.disabled=false;analysisStatus.className="status";analysisStatus.textContent="写真を読み込みました。「顔の特徴を解析」を押してください。";analysisResult.innerHTML="";measuredMetrics=null};
+ preview.onload=()=>{document.getElementById("suggestHair").disabled=false;document.getElementById("applyHair").disabled=true;proposedHair=null;candidateOptions=[];document.getElementById("hairCandidateList").hidden=true;document.getElementById("hairSuggestStatus").textContent="写真を読み込みました。推定できます。";analyzeButton.disabled=false;analysisStatus.className="status";analysisStatus.textContent="写真を読み込みました。「顔の特徴を解析」を押してください。";analysisResult.innerHTML="";measuredMetrics=null};
  preview.onerror=()=>{document.getElementById("suggestHair").disabled=true;analyzeButton.disabled=true;analysisStatus.className="status error";analysisStatus.textContent="画像を読み込めませんでした。JPGまたはPNGで試してください。"};
  preview.src=selectedFileUrl;preview.style.display="block";
 });
@@ -250,21 +252,30 @@ function hairCandidateFromImage(image, landmarks){
  const brow=rgb(((landmarks[70].x+landmarks[300].x)/2)*w,((landmarks[70].y+landmarks[300].y)/2)*h);
  const fringeContrast=Math.min(diff(forehead,cheek),diff(brow,cheek));
  const fringeHint=fringeContrast>38;
- // Short compact hair / straight bob / textured medium / long voluminous.
- // Scores are engineering hypotheses, not learned similarities or probabilities.
- const score={
-  1:Math.max(0,.24-coverage)*4+Math.max(0,.10-extension)*2,
-  25:1.0-Math.abs(coverage-.34)*2.2-Math.abs(extension-.17)*1.2,
-  35:1.05-Math.abs(coverage-.27)*2.0-Math.abs(extension-.09)*1.6+(fringeHint?.16:0),
-  41:.6+Math.max(0,extension-.23)*2.5+Math.max(0,coverage-.44)*2.0
- };
- // A substantial lower extension indicates long hair regardless of fringe proxy.
- if(extension>.42)score[41]+=1.2;
- const ranked=Object.entries(score).sort((a,b)=>b[1]-a[1]);
- const type=Number(ranked[0][0]);
- const length1=Math.max(0,Math.min(10,Math.round(2+extension*8)));
- const length2=Math.max(0,Math.min(10,Math.round(3+coverage*12)));
- return {type,length1,length2,method:"unvalidated_hair_shape_heuristic",coverage:Number(coverage.toFixed(2)),extension:Number(extension.toFixed(2)),fringeContrast:Number(fringeContrast.toFixed(1)),fringeHint,ranking:ranked.map(([type,score])=>Number(type))};
+ // Uncalibrated reference profiles. These are hypotheses, NOT measured game presets.
+ // Each candidate receives its own length pair before joint scoring.
+ const profiles=[
+  {type:1,c:.12,e:.03,fringe:0},
+  {type:25,c:.34,e:.17,fringe:0},
+  {type:35,c:.27,e:.09,fringe:1},
+  {type:41,c:.51,e:.47,fringe:0}
+ ];
+ const clamp=n=>Math.max(0,Math.min(10,Math.round(n)));
+ const candidates=profiles.map(p=>{
+  // Approximate per-type length effects. Coefficients require calibration from gameplay.
+  const length1=clamp(5+(extension-p.e)*9);
+  const length2=clamp(5+(coverage-p.c)*12);
+  const adjustedE=p.e+(length1-5)/9;
+  const adjustedC=p.c+(length2-5)/12;
+  const shapeError=Math.abs(extension-adjustedE)*1.6+Math.abs(coverage-adjustedC)*2;
+  const adjustmentCost=(Math.abs(length1-5)+Math.abs(length2-5))*.018;
+  const fringeCost=(fringeHint!==Boolean(p.fringe))*.12;
+  // Penalize implausible large departures; do not hardcode type 35 as winner.
+  const score=1-shapeError-adjustmentCost-fringeCost;
+  return {type:p.type,length1,length2,score:Number(score.toFixed(3))};
+ }).sort((a,b)=>b.score-a.score);
+ const best=candidates[0];
+ return {type:best.type,length1:best.length1,length2:best.length2,method:"uncalibrated_joint_hair_length_heuristic",coverage:Number(coverage.toFixed(2)),extension:Number(extension.toFixed(2)),fringeContrast:Number(fringeContrast.toFixed(1)),fringeHint,ranking:candidates.map(c=>c.type),candidates};
 }
 document.getElementById("suggestHair").addEventListener("click",async()=>{
  const status=document.getElementById("hairSuggestStatus"),button=document.getElementById("suggestHair");
@@ -277,6 +288,19 @@ document.getElementById("suggestHair").addEventListener("click",async()=>{
   proposedHair=hairCandidateFromImage(preview,result.faceLandmarks[0]);
   if(!proposedHair)throw new Error("画像から候補を推定できませんでした。");
   status.textContent=`暫定候補：タイプ${proposedHair.type}（次点：${proposedHair.ranking.slice(1,3).join("・")}）。長さ設定1：${proposedHair.length1}、設定2：${proposedHair.length2}。前髪らしい色差も参考にしますが、直毛の識別やゲーム内値への最適化は未検証です。`;
+  candidateOptions=proposedHair.candidates;
+  const list=document.getElementById("hairCandidateList");
+  list.hidden=false;
+  list.replaceChildren();
+  const heading=document.createElement("strong");heading.textContent="候補別の組み合わせ（実験値）";list.appendChild(heading);
+  const note=document.createElement("p");note.className="hint";note.textContent="評価点は仮の形状誤差から計算した比較用スコアです。確率・実測類似度ではありません。各候補の長さもゲーム画面での校正前です。";list.appendChild(note);
+  candidateOptions.forEach((c,i)=>{
+   const b=document.createElement("button");b.type="button";b.className="btn";
+   b.style.cssText="display:block;width:100%;text-align:left;margin:8px 0;white-space:normal";
+   b.textContent=`${i+1}位 タイプ${c.type} / 長さ1：${c.length1} / 長さ2：${c.length2} / 評価点 ${c.score.toFixed(3)}`;
+   b.addEventListener("click",()=>{proposedHair={...proposedHair,type:c.type,length1:c.length1,length2:c.length2};status.textContent=`タイプ${c.type}を反映候補に選択しました。設定に反映を押してください。`;});
+   list.appendChild(b);
+  });
   document.getElementById("applyHair").disabled=false;
  }catch(e){proposedHair=null;status.textContent=e.message||"推定できませんでした。";document.getElementById("applyHair").disabled=true;}
  finally{button.disabled=false;}
@@ -288,7 +312,7 @@ document.getElementById("applyHair").addEventListener("click",()=>{
  updateHairValue("hairLength2",proposedHair.length2);
  document.getElementById("hairSuggestStatus").textContent="暫定候補を反映しました。画像を見ながら手動で微調整してください。";
 });
-function payload(){return {app:"WILDS FACE LAB",version:"0.4.2-experimental-frontal",profile:gender,hair:{type:values.hairType,lengthSetting1:values.hairLength1,lengthSetting2:values.hairLength2},hairTypeObservedRange:"1–41 in uploaded video; maximum unverified",hairLengthRangeStatus:"0–10 provisional; verify in game",faceMeasurements:measuredMetrics,faceAnalysisStatus:measuredMetrics?"measured":"not_run",note:"Experimental, unvalidated shape/color heuristic with weak fringe proxy; only types 1, 25, 35, 41. Hair length 0–10 provisional, not calibrated to game."}}
+function payload(){return {app:"WILDS FACE LAB",version:"0.4.3-experimental-joint-ranking",profile:gender,hair:{type:values.hairType,lengthSetting1:values.hairLength1,lengthSetting2:values.hairLength2},hairTypeObservedRange:"1–41 in uploaded video; maximum unverified",hairLengthRangeStatus:"0–10 provisional; verify in game",faceMeasurements:measuredMetrics,faceAnalysisStatus:measuredMetrics?"measured":"not_run",note:"Experimental uncalibrated joint ranking of 4 types and candidate-specific lengths. Scores are not probabilities. 0–10 provisional."}}
 document.getElementById("copy").onclick=async()=>{const text=JSON.stringify(payload(),null,2);try{await navigator.clipboard.writeText(text);alert("設定メモをコピーしました")}catch(e){prompt("この内容をコピーしてください",text)}};
 document.getElementById("save").onclick=()=>{const blob=new Blob([JSON.stringify(payload(),null,2)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="wilds-hair-settings.json";a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)};
 window.addEventListener("beforeunload",()=>{if(selectedFileUrl)URL.revokeObjectURL(selectedFileUrl);if(faceLandmarker)faceLandmarker.close()});
