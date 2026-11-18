@@ -23,7 +23,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}.hint{color:var(--muted)
 </head>
 <body>
 <main class="wrap">
-  <header class="top"><div class="brand">WILDS / FACE LAB</div><div class="version">FACE + HAIR v0.4.7</div></header>
+  <header class="top"><div class="brand">WILDS / FACE LAB</div><div class="version">FACE + HAIR v0.4.8</div></header>
   <p class="eyebrow">FACE CONFIGURATION STUDIO</p>
   <h1>写真から<br>顔の特徴を測る。</h1>
   <p class="sub">顔写真から目・鼻・口・輪郭の位置関係を抽出する試験版です。ここで測定した特徴量を、次の段階でワイルズの実際の編集項目へ対応付けます。</p>
@@ -107,6 +107,12 @@ input[type=range]{width:100%;accent-color:var(--accent)}.hint{color:var(--muted)
     <button class="btn" type="button" id="addEyeSample" style="margin-top:12px">測定値と設定値を記録</button>
     <div class="status" id="eyeSampleStatus" role="status">写真を解析し、ゲーム内で確認した数値を入力してください。</div>
     <div id="eyeSampleList" class="hint"></div>
+    <div style="margin-top:12px">
+      <label for="eyeImportFile" class="hint">以前保存した校正JSONを読み込む（端末内のみ）</label>
+      <input id="eyeImportFile" type="file" accept=".json,application/json" style="display:block;max-width:100%;margin-top:8px">
+      <div class="status" id="eyeImportStatus" role="status">読み込み前の記録は、このページを閉じると消えます。JSONを保存してから終了してください。</div>
+      <p class="hint">注意：同じ写真の測定値に異なるゲーム設定値を付けても、変化量の校正にはなりません。ゲーム内の設定変更前後を同じ角度・表情で測定した独立データが必要です。</p>
+    </div>
   </section>
   <section class="card">
     <h2>06 / HAIR SETTINGS OUTPUT</h2>
@@ -410,12 +416,44 @@ document.getElementById("addEyeSample").addEventListener("click",()=>{
   status.textContent="先に写真を解析し、ゲーム画面で確認した整数値を入力してください。";return;
  }
  const item=document.getElementById("eyeCalItem").value;
+ if(eyeCalibrationSamples.length>=500){status.textContent="記録は500件までです。JSONに保存してください。";return;}
  eyeCalibrationSamples.push({item,gameValue:n,measurements:structuredClone(eyeCalibrationMeasurements.measurements),profile:gender,source:"user-entered game value; not independently verified"});
  status.textContent=`${item}：${n} を記録しました。JSON保存で書き出せます。`;
  renderEyeSamples();
 });
 renderEyeSamples();
-function payload(){return {app:"WILDS FACE LAB",version:"0.4.7-eye-calibration-samples",profile:gender,hair:{type:values.hairType,lengthSetting1:values.hairLength1,lengthSetting2:values.hairLength2},hairTypeObservedRange:"1–41 in uploaded video; maximum unverified",hairLengthRangeStatus:"0–10 provisional; verify in game",faceMeasurements:measuredMetrics,eyeCalibration:eyeCalibrationMeasurements,eyeCalibrationSamples:eyeCalibrationSamples,eyeGameSettings:verifiedEyeSettings.map(([name])=>({name,value:null,status:"uncalibrated"})),faceAnalysisStatus:measuredMetrics?"measured":"not_run",note:"Experimental uncalibrated joint ranking of 4 types and candidate-specific lengths. Scores are not probabilities. 0–10 provisional."}}
+// Import only the expected calibration records; never execute imported content.
+// Limits protect iPhone Safari from unexpectedly large or malformed JSON files.
+function isValidEyeSample(x){
+ return x && typeof x==="object" && ["目の幅","目の高さ","目の角度"].includes(x.item)
+  && Number.isSafeInteger(x.gameValue) && (x.profile==="MEN" || x.profile==="WOMEN")
+  && x.measurements && typeof x.measurements==="object" && !Array.isArray(x.measurements)
+  && Object.keys(x.measurements).length<=40
+  && Object.values(x.measurements).every(m=>m && typeof m==="object" && Number.isFinite(m.value) && typeof m.unit==="string" && m.unit.length<24);
+}
+document.getElementById("eyeImportFile").addEventListener("change",async event=>{
+ const status=document.getElementById("eyeImportStatus");
+ const file=event.target.files?.[0];if(!file)return;
+ try{
+  if(file.size>2_000_000)throw Error("2MB以下のJSONを選択してください。");
+  const data=JSON.parse(await file.text());
+  if(!data || !Array.isArray(data.eyeCalibrationSamples))throw Error("face-editorの校正JSONではありません。");
+  if(data.eyeCalibrationSamples.length>500)throw Error("記録が多すぎます（上限500件）。");
+  if(!data.eyeCalibrationSamples.every(isValidEyeSample))throw Error("校正記録の形式が正しくありません。");
+  let added=0;
+  const seen=new Set(eyeCalibrationSamples.map(x=>JSON.stringify([x.item,x.gameValue,x.profile,x.measurements])));
+  for(const x of data.eyeCalibrationSamples){
+   const key=JSON.stringify([x.item,x.gameValue,x.profile,x.measurements]);
+   if(!seen.has(key) && eyeCalibrationSamples.length<500){
+    eyeCalibrationSamples.push({item:x.item,gameValue:x.gameValue,profile:x.profile,measurements:structuredClone(x.measurements),source:"imported user-entered calibration; not independently verified"});
+    seen.add(key);added++;
+   }
+  }
+  renderEyeSamples();status.textContent=`${added}件の記録を読み込みました（重複は除外）。ゲーム内数値の自動推定はまだ未校正です。`;
+ }catch(e){status.textContent=`読み込み失敗：${e.message}`;}
+ finally{event.target.value="";}
+});
+function payload(){return {app:"WILDS FACE LAB",version:"0.4.8-eye-calibration-import",profile:gender,hair:{type:values.hairType,lengthSetting1:values.hairLength1,lengthSetting2:values.hairLength2},hairTypeObservedRange:"1–41 in uploaded video; maximum unverified",hairLengthRangeStatus:"0–10 provisional; verify in game",faceMeasurements:measuredMetrics,eyeCalibration:eyeCalibrationMeasurements,eyeCalibrationSamples:eyeCalibrationSamples,eyeGameSettings:verifiedEyeSettings.map(([name])=>({name,value:null,status:"uncalibrated"})),faceAnalysisStatus:measuredMetrics?"measured":"not_run",note:"Experimental uncalibrated joint ranking of 4 types and candidate-specific lengths. Scores are not probabilities. 0–10 provisional."}}
 document.getElementById("copy").onclick=async()=>{const text=JSON.stringify(payload(),null,2);try{await navigator.clipboard.writeText(text);alert("設定メモをコピーしました")}catch(e){prompt("この内容をコピーしてください",text)}};
 document.getElementById("save").onclick=()=>{const blob=new Blob([JSON.stringify(payload(),null,2)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="wilds-face-calibration.json";a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)};
 window.addEventListener("beforeunload",()=>{if(selectedFileUrl)URL.revokeObjectURL(selectedFileUrl);if(faceLandmarker)faceLandmarker.close()});
