@@ -107,6 +107,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}.hint{color:var(--muted)
     <button class="btn" type="button" id="addEyeSample" style="margin-top:12px">測定値と設定値を記録</button>
     <div class="status" id="eyeSampleStatus" role="status">写真を解析し、ゲーム内で確認した数値を入力してください。</div>
     <div id="eyeSampleList" class="hint"></div>
+    <div id="eyeCalibrationQuality" class="status" role="status" aria-live="polite">校正データの品質を確認します。</div>
     <div style="margin-top:12px">
       <label for="eyeImportFile" class="hint">以前保存した校正JSONを読み込む（端末内のみ）</label>
       <input id="eyeImportFile" type="file" accept=".json,application/json" style="display:block;max-width:100%;margin-top:8px">
@@ -404,6 +405,32 @@ document.getElementById("applyHair").addEventListener("click",()=>{
  updateHairValue("hairLength2",proposedHair.length2);
  document.getElementById("hairSuggestStatus").textContent="暫定候補を反映しました。画像を見ながら手動で微調整してください。";
 });
+// A quality gate, not a conversion formula: user-entered records alone cannot
+// establish causal effects of a single in-game slider.
+const eyeFeatureKeys={
+ "目の幅":"目の横幅（顔幅比）",
+ "目の高さ":"目の中心高さ（顔高比）",
+ "目の角度":"目尻の傾き"
+};
+function renderEyeCalibrationQuality(){
+ const panel=document.getElementById("eyeCalibrationQuality");
+ if(!panel)return;
+ const lines=[];
+ for(const [item,feature] of Object.entries(eyeFeatureKeys)){
+  const samples=eyeCalibrationSamples.filter(s=>s.item===item && s.profile===gender && Number.isFinite(s.measurements?.[feature]?.value));
+  const levels=new Set(samples.map(s=>s.gameValue)).size;
+  const measurements=new Set(samples.map(s=>s.measurements[feature].value.toFixed(3))).size;
+  const hasConflict=samples.some((s,i)=>samples.some((t,j)=>j>i && s.gameValue!==t.gameValue && Math.abs(s.measurements[feature].value-t.measurements[feature].value)<0.001));
+  let note="対応する実測記録なし";
+  if(samples.length)note=`${samples.length}件 / 設定値${levels}種類 / 測定値${measurements}種類`;
+  if(hasConflict)note+="（同じ測定値に異なる設定値：要確認）";
+  else if(samples.length && (levels<3 || measurements<3))note+="（比較データ不足）";
+  else if(samples.length)note+="（条件統一・他項目固定の確認が必要）";
+  lines.push(`${item}：${note}`);
+ }
+ panel.textContent="校正データの品質チェック（"+gender+"）\n"+lines.join("\n")+"\n※記録数が増えても、ゲーム内スライダーとの因果関係が検証できるまでは推奨値を算出しません。";
+ panel.style.whiteSpace="pre-line";
+}
 function renderEyeSamples(){
  const list=document.getElementById("eyeSampleList");
  list.textContent=eyeCalibrationSamples.length?`${eyeCalibrationSamples.length}件の校正記録をJSONに含めます（このページを閉じると消えます）。`:"校正記録はまだありません。";
@@ -420,8 +447,10 @@ document.getElementById("addEyeSample").addEventListener("click",()=>{
  eyeCalibrationSamples.push({item,gameValue:n,measurements:structuredClone(eyeCalibrationMeasurements.measurements),profile:gender,source:"user-entered game value; not independently verified"});
  status.textContent=`${item}：${n} を記録しました。JSON保存で書き出せます。`;
  renderEyeSamples();
+ renderEyeCalibrationQuality();
 });
 renderEyeSamples();
+renderEyeCalibrationQuality();
 // Import only the expected calibration records; never execute imported content.
 // Limits protect iPhone Safari from unexpectedly large or malformed JSON files.
 function isValidEyeSample(x){
@@ -449,11 +478,11 @@ document.getElementById("eyeImportFile").addEventListener("change",async event=>
     seen.add(key);added++;
    }
   }
-  renderEyeSamples();status.textContent=`${added}件の記録を読み込みました（重複は除外）。ゲーム内数値の自動推定はまだ未校正です。`;
+  renderEyeSamples();renderEyeCalibrationQuality();status.textContent=`${added}件の記録を読み込みました（重複は除外）。ゲーム内数値の自動推定はまだ未校正です。`;
  }catch(e){status.textContent=`読み込み失敗：${e.message}`;}
  finally{event.target.value="";}
 });
-function payload(){return {app:"WILDS FACE LAB",version:"0.4.8-eye-calibration-import",profile:gender,hair:{type:values.hairType,lengthSetting1:values.hairLength1,lengthSetting2:values.hairLength2},hairTypeObservedRange:"1–41 in uploaded video; maximum unverified",hairLengthRangeStatus:"0–10 provisional; verify in game",faceMeasurements:measuredMetrics,eyeCalibration:eyeCalibrationMeasurements,eyeCalibrationSamples:eyeCalibrationSamples,eyeGameSettings:verifiedEyeSettings.map(([name])=>({name,value:null,status:"uncalibrated"})),faceAnalysisStatus:measuredMetrics?"measured":"not_run",note:"Experimental uncalibrated joint ranking of 4 types and candidate-specific lengths. Scores are not probabilities. 0–10 provisional."}}
+function payload(){return {app:"WILDS FACE LAB",version:"0.4.9-eye-calibration-quality",profile:gender,hair:{type:values.hairType,lengthSetting1:values.hairLength1,lengthSetting2:values.hairLength2},hairTypeObservedRange:"1–41 in uploaded video; maximum unverified",hairLengthRangeStatus:"0–10 provisional; verify in game",faceMeasurements:measuredMetrics,eyeCalibration:eyeCalibrationMeasurements,eyeCalibrationSamples:eyeCalibrationSamples,eyeGameSettings:verifiedEyeSettings.map(([name])=>({name,value:null,status:"uncalibrated"})),faceAnalysisStatus:measuredMetrics?"measured":"not_run",note:"Experimental uncalibrated joint ranking of 4 types and candidate-specific lengths. Scores are not probabilities. 0–10 provisional."}}
 document.getElementById("copy").onclick=async()=>{const text=JSON.stringify(payload(),null,2);try{await navigator.clipboard.writeText(text);alert("設定メモをコピーしました")}catch(e){prompt("この内容をコピーしてください",text)}};
 document.getElementById("save").onclick=()=>{const blob=new Blob([JSON.stringify(payload(),null,2)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="wilds-face-calibration.json";a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)};
 window.addEventListener("beforeunload",()=>{if(selectedFileUrl)URL.revokeObjectURL(selectedFileUrl);if(faceLandmarker)faceLandmarker.close()});
