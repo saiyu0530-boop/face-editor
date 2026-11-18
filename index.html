@@ -23,7 +23,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}.hint{color:var(--muted)
 </head>
 <body>
 <main class="wrap">
-  <header class="top"><div class="brand">WILDS / FACE LAB</div><div class="version">FACE + HAIR v0.4.6</div></header>
+  <header class="top"><div class="brand">WILDS / FACE LAB</div><div class="version">FACE + HAIR v0.4.7</div></header>
   <p class="eyebrow">FACE CONFIGURATION STUDIO</p>
   <h1>写真から<br>顔の特徴を測る。</h1>
   <p class="sub">顔写真から目・鼻・口・輪郭の位置関係を抽出する試験版です。ここで測定した特徴量を、次の段階でワイルズの実際の編集項目へ対応付けます。</p>
@@ -98,6 +98,17 @@ input[type=range]{width:100%;accent-color:var(--accent)}.hint{color:var(--muted)
   </section>
 
   <section class="card">
+    <h2>05A / EYE CALIBRATION LOG（目元の校正記録）</h2>
+    <p class="hint">ゲーム画面で実際に設定した値を記録する実験用フォームです。写真の測定値と組み合わせてJSONに保存します。ゲーム内の値を自動推定する機能ではありません。</p>
+    <div class="controls">
+      <div class="control"><label for="eyeCalItem">ゲーム内項目</label><select id="eyeCalItem" class="btn" style="width:100%;margin-top:8px"><option>目の幅</option><option>目の高さ</option><option>目の角度</option></select></div>
+      <div class="control"><label for="eyeCalValue">ゲーム内で確認した設定値</label><input id="eyeCalValue" type="number" inputmode="numeric" step="1" placeholder="実際の数値を入力" style="width:100%;margin-top:8px;padding:12px;background:#12151d;color:white;border:1px solid #596174;border-radius:10px"></div>
+    </div>
+    <button class="btn" type="button" id="addEyeSample" style="margin-top:12px">測定値と設定値を記録</button>
+    <div class="status" id="eyeSampleStatus" role="status">写真を解析し、ゲーム内で確認した数値を入力してください。</div>
+    <div id="eyeSampleList" class="hint"></div>
+  </section>
+  <section class="card">
     <h2>06 / HAIR SETTINGS OUTPUT</h2>
     <div class="result" id="result"></div>
     <div class="actions">
@@ -119,6 +130,7 @@ let gender="MEN";
 let selectedFileUrl=null;
 let faceLandmarker=null;
 let eyeCalibrationMeasurements=null;
+const eyeCalibrationSamples=[];
 let measuredMetrics=null;
 let proposedHair=null;
 let candidateOptions=[];
@@ -386,7 +398,24 @@ document.getElementById("applyHair").addEventListener("click",()=>{
  updateHairValue("hairLength2",proposedHair.length2);
  document.getElementById("hairSuggestStatus").textContent="暫定候補を反映しました。画像を見ながら手動で微調整してください。";
 });
-function payload(){return {app:"WILDS FACE LAB",version:"0.4.6-eye-calibration-data",profile:gender,hair:{type:values.hairType,lengthSetting1:values.hairLength1,lengthSetting2:values.hairLength2},hairTypeObservedRange:"1–41 in uploaded video; maximum unverified",hairLengthRangeStatus:"0–10 provisional; verify in game",faceMeasurements:measuredMetrics,eyeCalibration:eyeCalibrationMeasurements,eyeGameSettings:verifiedEyeSettings.map(([name])=>({name,value:null,status:"uncalibrated"})),faceAnalysisStatus:measuredMetrics?"measured":"not_run",note:"Experimental uncalibrated joint ranking of 4 types and candidate-specific lengths. Scores are not probabilities. 0–10 provisional."}}
+function renderEyeSamples(){
+ const list=document.getElementById("eyeSampleList");
+ list.textContent=eyeCalibrationSamples.length?`${eyeCalibrationSamples.length}件の校正記録をJSONに含めます（このページを閉じると消えます）。`:"校正記録はまだありません。";
+}
+document.getElementById("addEyeSample").addEventListener("click",()=>{
+ const status=document.getElementById("eyeSampleStatus");
+ const raw=document.getElementById("eyeCalValue").value.trim();
+ const n=Number(raw);
+ if(!eyeCalibrationMeasurements || !raw || !Number.isSafeInteger(n)){
+  status.textContent="先に写真を解析し、ゲーム画面で確認した整数値を入力してください。";return;
+ }
+ const item=document.getElementById("eyeCalItem").value;
+ eyeCalibrationSamples.push({item,gameValue:n,measurements:structuredClone(eyeCalibrationMeasurements.measurements),profile:gender,source:"user-entered game value; not independently verified"});
+ status.textContent=`${item}：${n} を記録しました。JSON保存で書き出せます。`;
+ renderEyeSamples();
+});
+renderEyeSamples();
+function payload(){return {app:"WILDS FACE LAB",version:"0.4.7-eye-calibration-samples",profile:gender,hair:{type:values.hairType,lengthSetting1:values.hairLength1,lengthSetting2:values.hairLength2},hairTypeObservedRange:"1–41 in uploaded video; maximum unverified",hairLengthRangeStatus:"0–10 provisional; verify in game",faceMeasurements:measuredMetrics,eyeCalibration:eyeCalibrationMeasurements,eyeCalibrationSamples:eyeCalibrationSamples,eyeGameSettings:verifiedEyeSettings.map(([name])=>({name,value:null,status:"uncalibrated"})),faceAnalysisStatus:measuredMetrics?"measured":"not_run",note:"Experimental uncalibrated joint ranking of 4 types and candidate-specific lengths. Scores are not probabilities. 0–10 provisional."}}
 document.getElementById("copy").onclick=async()=>{const text=JSON.stringify(payload(),null,2);try{await navigator.clipboard.writeText(text);alert("設定メモをコピーしました")}catch(e){prompt("この内容をコピーしてください",text)}};
 document.getElementById("save").onclick=()=>{const blob=new Blob([JSON.stringify(payload(),null,2)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="wilds-face-calibration.json";a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)};
 window.addEventListener("beforeunload",()=>{if(selectedFileUrl)URL.revokeObjectURL(selectedFileUrl);if(faceLandmarker)faceLandmarker.close()});
