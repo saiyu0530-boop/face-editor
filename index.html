@@ -23,7 +23,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}.hint{color:var(--muted)
 </head>
 <body>
 <main class="wrap">
-  <header class="top"><div class="brand">WILDS / FACE LAB</div><div class="version">FACE + HAIR v0.4.4</div></header>
+  <header class="top"><div class="brand">WILDS / FACE LAB</div><div class="version">FACE + HAIR v0.4.5</div></header>
   <p class="eyebrow">FACE CONFIGURATION STUDIO</p>
   <h1>写真から<br>顔の特徴を測る。</h1>
   <p class="sub">顔写真から目・鼻・口・輪郭の位置関係を抽出する試験版です。ここで測定した特徴量を、次の段階でワイルズの実際の編集項目へ対応付けます。</p>
@@ -64,6 +64,10 @@ input[type=range]{width:100%;accent-color:var(--accent)}.hint{color:var(--muted)
     <div class="status" id="eyeStatus" role="status" aria-live="polite">顔写真を選択して、顔の特徴を解析してください。</div>
     <div class="result" id="eyeResult" aria-live="polite"></div>
     <p class="hint">角度は画像平面上の値です。顔の傾き・表情・撮影角度に影響されるため、正面・無表情の写真を推奨します。</p>
+    <h3 style="font-size:15px;margin:20px 0 8px">ゲーム内の目元設定（動画から確認）</h3>
+    <p class="hint">以下は動画で読めた正式な項目名です。設定値の自動変換は、ゲーム内の変化量を校正するまで「未算出」とします。動画の20などは撮影時の値であり、推奨値・最大値ではありません。</p>
+    <div class="result" id="eyeGameMapping"></div>
+
   </section>
   <section class="card">
     <h2>05 / HAIR EDIT (髪)</h2>
@@ -199,6 +203,34 @@ async function loadFaceLandmarker(){
  });
  return faceLandmarker;
 }
+const verifiedEyeSettings=[
+ ["目の大きさ","目の開き・横幅（複合）"],
+ ["目の奥行き","正面写真だけでは奥行きを確定できない"],
+ ["目の高さ","目の上下位置"],
+ ["目の幅","目の横幅（顔幅比）"],
+ ["目の角度","目尻の傾き"],
+ ["目頭の高さ","目頭の上下位置"],
+ ["目尻の高さ","目尻の上下位置"],
+ ["上まぶたの高さ","上まぶたの位置"],
+ ["上まぶたの角度","上まぶたの傾き"],
+ ["下まぶたの高さ","下まぶたの位置"],
+ ["下まぶたの角度","下まぶたの傾き"],
+ ["二重まぶたの幅","まぶたの折り目（写真によって検出困難）"],
+ ["二重まぶたの角度","まぶたの折り目の角度（写真によって検出困難）"]
+];
+function renderEyeGameMapping(){
+ const panel=document.getElementById("eyeGameMapping");
+ if(!panel)return;
+ panel.replaceChildren();
+ for(const [name,feature] of verifiedEyeSettings){
+  const card=document.createElement("div");card.className="metric";
+  const label=document.createElement("span");label.textContent=name;
+  const value=document.createElement("strong");value.textContent="未算出";value.style.fontSize="15px";
+  const note=document.createElement("div");note.className="hint";note.textContent="対応候補: "+feature;
+  card.append(label,value,note);panel.appendChild(card);
+ }
+}
+renderEyeGameMapping();
 analyzeButton.addEventListener("click",async()=>{
  if(!preview.complete||!preview.naturalWidth){analysisStatus.className="status error";analysisStatus.textContent="先に顔写真を選択してください。";return}
  analyzeButton.disabled=true;
@@ -231,6 +263,8 @@ analyzeButton.addEventListener("click",async()=>{
    ["口元から顎先（顔高比）",pct(chinLength,faceHeight)]
   ];
   // MediaPipe Face Mesh landmark measurements; not game slider values.
+  // Mapping is descriptive only: never manufacture game slider values from landmark ratios.
+  renderEyeGameMapping();
   const eyeMeasurements=measureEyes(p,faceWidth);
   document.getElementById("eyeResult").innerHTML=eyeMeasurements.map(([label,value,unit])=>`<div class="metric"><span>${label}</span><strong>${value.toFixed(1)}${unit}</strong></div>`).join("");
   document.getElementById("eyeStatus").textContent="左右別の目元特徴量を測定しました（ゲーム内設定値ではありません）。";
