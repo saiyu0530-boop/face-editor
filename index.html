@@ -17,11 +17,12 @@ h1{font-size:clamp(30px,8vw,48px);line-height:1.03;letter-spacing:-.055em;margin
 input[type=range]{width:100%;accent-color:var(--accent)}.hint{color:var(--muted);font-size:12px;line-height:1.6}.status{padding:11px 13px;border-radius:11px;background:#12151d;color:var(--muted);font-size:13px;line-height:1.6;margin:12px 0}.status.ok{color:#d6ff9b;border:1px solid #52703c}.status.error{color:#ffb6b6;border:1px solid #7a4545}
 .result{display:grid;grid-template-columns:1fr 1fr;gap:10px}.metric{background:#12151d;border:1px solid var(--line);border-radius:13px;padding:13px}.metric span{display:block;color:var(--muted);font-size:11px;margin-bottom:6px}.metric strong{font-size:20px;color:var(--accent);font-variant-numeric:tabular-nums}.actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}.foot{color:#707789;text-align:center;font-size:11px;margin-top:26px;line-height:1.7}
 .type-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:7px;margin:12px 0 18px}.type-choice{padding:10px 0;min-height:43px;font-variant-numeric:tabular-nums}.type-choice[aria-pressed="true"]{background:var(--accent);color:#14170e;border-color:var(--accent)}@media(min-width:620px){.controls{grid-template-columns:1fr 1fr}.wrap{padding-top:36px}.card{padding:22px}}
+.hair-examples{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:12px 0 16px}.hair-example{background:#151923;border:1px solid #444b5b;border-radius:12px;padding:5px;color:#fff;text-align:left;cursor:pointer;min-width:0}.hair-example img{display:block;width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:7px}.hair-example span{display:block;font-size:12px;padding:6px 2px 2px}.hair-example[aria-pressed="true"]{outline:2px solid var(--accent)}@media(max-width:440px){.hair-examples{grid-template-columns:1fr 1fr}}
 </style>
 </head>
 <body>
 <main class="wrap">
-  <header class="top"><div class="brand">WILDS / FACE LAB</div><div class="version">HAIR EDITOR v0.3.3</div></header>
+  <header class="top"><div class="brand">WILDS / FACE LAB</div><div class="version">HAIR EDITOR v0.3.4</div></header>
   <p class="eyebrow">FACE CONFIGURATION STUDIO</p>
   <h1>写真から<br>顔の特徴を測る。</h1>
   <p class="sub">顔写真から目・鼻・口・輪郭の位置関係を抽出する試験版です。ここで測定した特徴量を、次の段階でワイルズの実際の編集項目へ対応付けます。</p>
@@ -59,10 +60,15 @@ input[type=range]{width:100%;accent-color:var(--accent)}.hint{color:var(--muted)
   <section class="card">
     <h2>04 / HAIR EDIT (髪)</h2>
     <p class="hint">動画で確認した女性ハンターの髪型タイプ1〜41を選択できます。41は動画内で確認できた番号であり、ゲーム内の最大番号とは限りません。髪の長さは暫定0〜10の操作範囲です。</p>
-    <p class="hint">髪型番号をタップして直接選択（見た目の画像は未登録）</p>
+    <p class="hint">動画から確認できた3つの参考画像（タイプ1・25・41）。画像を押すとそのタイプを選択できます。ほかの番号の画像は未登録です。</p>
+    <div class="hair-examples" id="hairExamples" role="group" aria-label="動画の髪型参考画像">
+      <button class="hair-example" type="button" data-example="1" aria-pressed="true"><img src="assets/type-2.jpg" alt="動画の髪型タイプ1、短髪の参考画面" loading="lazy"><span>タイプ 1</span></button>
+      <button class="hair-example" type="button" data-example="25" aria-pressed="false"><img src="assets/type-190.jpg" alt="動画の髪型タイプ25、横向きの参考画面" loading="lazy"><span>タイプ 25</span></button>
+      <button class="hair-example" type="button" data-example="41" aria-pressed="false"><img src="assets/type-350.jpg" alt="動画の髪型タイプ41、長髪の参考画面" loading="lazy"><span>タイプ 41</span></button>
+    </div>
     <div class="type-grid" id="hairTypeGrid" role="group" aria-label="髪のタイプを番号で選択"></div>
     <div class="controls" id="controls"></div>
-    <p class="hint">各項目の「− 1」「＋ 1」で1段階ずつ調整できます。男性の髪型番号への適用は未確認です。髪型の画像プレビュー・写真からの髪型自動判定は未実装です。色の設定は今回含めていません。</p>
+    <p class="hint">各項目の「− 1」「＋ 1」で1段階ずつ調整できます。男性の髪型番号への適用は未確認です。髪型の参考画像は3種類のみです。写真からの髪型自動判定は未実装です。色の設定は今回含めていません。</p>
   </section>
 
   <section class="card">
@@ -112,6 +118,7 @@ function render(){
  syncTypeGrid();
 }
 function syncTypeGrid(){
+ document.querySelectorAll("#hairExamples button").forEach(b=>b.setAttribute("aria-pressed",String(Number(b.dataset.example)===values.hairType)));
  document.querySelectorAll("#hairTypeGrid button").forEach(b=>{b.setAttribute("aria-pressed",String(Number(b.dataset.type)===values.hairType));});
 }
 function renderResult(){result.innerHTML=definitions.map(d=>`<div class="metric"><span>${d.label.split(" / ")[0]}</span><strong>${values[d.id]}</strong></div>`).join("")}
@@ -185,7 +192,7 @@ analyzeButton.addEventListener("click",async()=>{
   analysisStatus.textContent=error&&error.message?error.message:"解析中にエラーが発生しました。通信環境を確認して再試行してください。";
  }finally{analyzeButton.disabled=false}
 });
-function payload(){return {app:"WILDS FACE LAB",version:"0.3.3-type-grid",profile:gender,hair:{type:values.hairType,lengthSetting1:values.hairLength1,lengthSetting2:values.hairLength2},hairTypeObservedRange:"1–41 in uploaded video; maximum unverified",hairLengthRangeStatus:"0–10 provisional; verify in game",faceMeasurements:measuredMetrics,faceAnalysisStatus:measuredMetrics?"measured":"not_run",note:"Hair values are manually entered. Automatic hair recognition and mapping are not implemented."}}
+function payload(){return {app:"WILDS FACE LAB",version:"0.3.4-reference-gallery",profile:gender,hair:{type:values.hairType,lengthSetting1:values.hairLength1,lengthSetting2:values.hairLength2},hairTypeObservedRange:"1–41 in uploaded video; maximum unverified",hairLengthRangeStatus:"0–10 provisional; verify in game",faceMeasurements:measuredMetrics,faceAnalysisStatus:measuredMetrics?"measured":"not_run",note:"Hair values are manually entered. Automatic hair recognition and mapping are not implemented."}}
 document.getElementById("copy").onclick=async()=>{const text=JSON.stringify(payload(),null,2);try{await navigator.clipboard.writeText(text);alert("設定メモをコピーしました")}catch(e){prompt("この内容をコピーしてください",text)}};
 document.getElementById("save").onclick=()=>{const blob=new Blob([JSON.stringify(payload(),null,2)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="wilds-hair-settings.json";a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)};
 window.addEventListener("beforeunload",()=>{if(selectedFileUrl)URL.revokeObjectURL(selectedFileUrl);if(faceLandmarker)faceLandmarker.close()});
@@ -197,6 +204,7 @@ for(let i=1;i<=41;i++){
  b.addEventListener("click",()=>updateHairValue("hairType",i));
  typeGrid.appendChild(b);
 }
+document.querySelectorAll("#hairExamples button").forEach(b=>b.addEventListener("click",()=>updateHairValue("hairType",Number(b.dataset.example))));
 render();
 </script>
 </body>
