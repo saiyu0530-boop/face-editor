@@ -23,7 +23,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}.hint{color:var(--muted)
 </head>
 <body>
 <main class="wrap">
-  <header class="top"><div class="brand">WILDS / FACE LAB</div><div class="version">FACE + HAIR v0.4.5</div></header>
+  <header class="top"><div class="brand">WILDS / FACE LAB</div><div class="version">FACE + HAIR v0.4.6</div></header>
   <p class="eyebrow">FACE CONFIGURATION STUDIO</p>
   <h1>写真から<br>顔の特徴を測る。</h1>
   <p class="sub">顔写真から目・鼻・口・輪郭の位置関係を抽出する試験版です。ここで測定した特徴量を、次の段階でワイルズの実際の編集項目へ対応付けます。</p>
@@ -118,6 +118,7 @@ let values=Object.fromEntries(definitions.map(x=>[x.id,x.value]));
 let gender="MEN";
 let selectedFileUrl=null;
 let faceLandmarker=null;
+let eyeCalibrationMeasurements=null;
 let measuredMetrics=null;
 let proposedHair=null;
 let candidateOptions=[];
@@ -164,7 +165,7 @@ document.getElementById("photo").addEventListener("change",e=>{
  if(!f)return;
  if(selectedFileUrl)URL.revokeObjectURL(selectedFileUrl);
  selectedFileUrl=URL.createObjectURL(f);
- preview.onload=()=>{document.getElementById("suggestHair").disabled=false;document.getElementById("applyHair").disabled=true;proposedHair=null;candidateOptions=[];document.getElementById("hairCandidateList").hidden=true;document.getElementById("hairSuggestStatus").textContent="写真を読み込みました。推定できます。";analyzeButton.disabled=false;analysisStatus.className="status";analysisStatus.textContent="写真を読み込みました。「顔の特徴を解析」を押してください。";analysisResult.innerHTML="";document.getElementById("eyeResult").innerHTML="";document.getElementById("eyeStatus").textContent="顔の特徴を解析すると目元の測定値が表示されます。";measuredMetrics=null};
+ preview.onload=()=>{document.getElementById("suggestHair").disabled=false;document.getElementById("applyHair").disabled=true;proposedHair=null;candidateOptions=[];document.getElementById("hairCandidateList").hidden=true;document.getElementById("hairSuggestStatus").textContent="写真を読み込みました。推定できます。";analyzeButton.disabled=false;analysisStatus.className="status";analysisStatus.textContent="写真を読み込みました。「顔の特徴を解析」を押してください。";analysisResult.innerHTML="";document.getElementById("eyeResult").innerHTML="";document.getElementById("eyeStatus").textContent="顔の特徴を解析すると目元の測定値が表示されます。";measuredMetrics=null;eyeCalibrationMeasurements=null};
  preview.onerror=()=>{document.getElementById("suggestHair").disabled=true;analyzeButton.disabled=true;analysisStatus.className="status error";analysisStatus.textContent="画像を読み込めませんでした。JPGまたはPNGで試してください。"};
  preview.src=selectedFileUrl;preview.style.display="block";
 });
@@ -266,12 +267,22 @@ analyzeButton.addEventListener("click",async()=>{
   // Mapping is descriptive only: never manufacture game slider values from landmark ratios.
   renderEyeGameMapping();
   const eyeMeasurements=measureEyes(p,faceWidth);
+  const faceCenterY=(p[10].y+p[152].y)/2;
+  const eyePositionMeasurements=[
+   ["目の中心高さ（顔高比）",pct(((p[33].y+p[133].y+p[263].y+p[362].y)/4)-p[10].y,faceHeight),"%"],
+   ["画像左・目頭高さ（顔高比）",pct(p[133].y-p[10].y,faceHeight),"%"],
+   ["画像左・目尻高さ（顔高比）",pct(p[33].y-p[10].y,faceHeight),"%"],
+   ["画像右・目頭高さ（顔高比）",pct(p[362].y-p[10].y,faceHeight),"%"],
+   ["画像右・目尻高さ（顔高比）",pct(p[263].y-p[10].y,faceHeight),"%"]
+  ];
+  eyeMeasurements.push(...eyePositionMeasurements);
+  eyeCalibrationMeasurements={method:"MediaPipe FaceLandmarker image-plane ratios",cameraOrientation:"image-left/right; not anatomical left/right",status:"uncalibrated; not game slider values",measurements:Object.fromEntries(eyeMeasurements.map(([name,value,unit])=>[name,{value:Number(value.toFixed(3)),unit}]))};
   document.getElementById("eyeResult").innerHTML=eyeMeasurements.map(([label,value,unit])=>`<div class="metric"><span>${label}</span><strong>${value.toFixed(1)}${unit}</strong></div>`).join("");
   document.getElementById("eyeStatus").textContent="左右別の目元特徴量を測定しました（ゲーム内設定値ではありません）。";
   measuredMetrics=Object.fromEntries(metrics.map(([label,value])=>[label,Number(value.toFixed(2))]));
   analysisResult.innerHTML=metrics.map(([label,value])=>metric(label,value)).join("");
   analysisStatus.className="status ok";
-  analysisStatus.textContent="顔を検出しました。測定値は画像内のランドマーク比率です。ゲーム内スライダー値への変換はまだ行っていません。";
+  analysisStatus.textContent="顔を検出しました。目元の位置データも計測しました。保存JSONに校正用データを含めます。ゲーム内スライダー値は未算出です。";
  }catch(error){
   analysisStatus.className="status error";
   analysisStatus.textContent=error&&error.message?error.message:"解析中にエラーが発生しました。通信環境を確認して再試行してください。";
@@ -375,9 +386,9 @@ document.getElementById("applyHair").addEventListener("click",()=>{
  updateHairValue("hairLength2",proposedHair.length2);
  document.getElementById("hairSuggestStatus").textContent="暫定候補を反映しました。画像を見ながら手動で微調整してください。";
 });
-function payload(){return {app:"WILDS FACE LAB",version:"0.4.4-eye-landmark-experimental",profile:gender,hair:{type:values.hairType,lengthSetting1:values.hairLength1,lengthSetting2:values.hairLength2},hairTypeObservedRange:"1–41 in uploaded video; maximum unverified",hairLengthRangeStatus:"0–10 provisional; verify in game",faceMeasurements:measuredMetrics,faceAnalysisStatus:measuredMetrics?"measured":"not_run",note:"Experimental uncalibrated joint ranking of 4 types and candidate-specific lengths. Scores are not probabilities. 0–10 provisional."}}
+function payload(){return {app:"WILDS FACE LAB",version:"0.4.6-eye-calibration-data",profile:gender,hair:{type:values.hairType,lengthSetting1:values.hairLength1,lengthSetting2:values.hairLength2},hairTypeObservedRange:"1–41 in uploaded video; maximum unverified",hairLengthRangeStatus:"0–10 provisional; verify in game",faceMeasurements:measuredMetrics,eyeCalibration:eyeCalibrationMeasurements,eyeGameSettings:verifiedEyeSettings.map(([name])=>({name,value:null,status:"uncalibrated"})),faceAnalysisStatus:measuredMetrics?"measured":"not_run",note:"Experimental uncalibrated joint ranking of 4 types and candidate-specific lengths. Scores are not probabilities. 0–10 provisional."}}
 document.getElementById("copy").onclick=async()=>{const text=JSON.stringify(payload(),null,2);try{await navigator.clipboard.writeText(text);alert("設定メモをコピーしました")}catch(e){prompt("この内容をコピーしてください",text)}};
-document.getElementById("save").onclick=()=>{const blob=new Blob([JSON.stringify(payload(),null,2)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="wilds-hair-settings.json";a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)};
+document.getElementById("save").onclick=()=>{const blob=new Blob([JSON.stringify(payload(),null,2)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="wilds-face-calibration.json";a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)};
 window.addEventListener("beforeunload",()=>{if(selectedFileUrl)URL.revokeObjectURL(selectedFileUrl);if(faceLandmarker)faceLandmarker.close()});
 const typeGrid=document.getElementById("hairTypeGrid");
 for(let i=1;i<=41;i++){
