@@ -11,21 +11,20 @@
 .wrap{max-width:760px;margin:auto;padding:24px 18px 56px}.top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:30px}.brand{font-size:12px;letter-spacing:.22em;color:var(--accent);font-weight:800}.version{font-size:11px;color:var(--muted);border:1px solid var(--line);padding:6px 9px;border-radius:99px}
 h1{font-size:clamp(30px,8vw,48px);line-height:1.03;letter-spacing:-.055em;margin:0 0 10px}.sub{color:var(--muted);font-size:14px;line-height:1.7;margin:0 0 25px}.eyebrow{font-size:11px;letter-spacing:.16em;color:var(--accent);font-weight:800;margin:0 0 10px}
 .card{background:linear-gradient(145deg,rgba(255,255,255,.045),transparent 55%),var(--panel);border:1px solid var(--line);border-radius:20px;padding:18px;margin:16px 0;box-shadow:0 12px 35px #0002}
-.card h2{font-size:17px;margin:0 0 15px}.row{display:flex;gap:10px;align-items:center}.seg{display:flex;background:#11131a;border:1px solid var(--line);padding:4px;border-radius:12px;flex:1}.seg button{flex:1}.btn{border:1px solid var(--line);background:var(--panel2);color:var(--text);padding:12px 14px;border-radius:11px;font-size:14px;font-weight:700;cursor:pointer}.btn.active,.btn.primary{background:var(--accent);color:#14170e;border-color:var(--accent)}.btn.ghost{background:transparent}
-.upload{border:1.5px dashed #596174;border-radius:16px;padding:20px;text-align:center;background:#12151d}.upload strong{display:block;margin:5px 0}.upload small{color:var(--muted)}input[type=file]{display:none}.preview{display:none;margin-top:14px;max-height:320px;width:100%;object-fit:contain;border-radius:12px;background:#0d0e13}
+.card h2{font-size:17px;margin:0 0 15px}.row{display:flex;gap:10px;align-items:center}.seg{display:flex;background:#11131a;border:1px solid var(--line);padding:4px;border-radius:12px;flex:1}.seg button{flex:1}.btn{border:1px solid var(--line);background:var(--panel2);color:var(--text);padding:12px 14px;border-radius:11px;font-size:14px;font-weight:700;cursor:pointer}.btn:disabled{opacity:.45;cursor:not-allowed}.btn.active,.btn.primary{background:var(--accent);color:#14170e;border-color:var(--accent)}.btn.ghost{background:transparent}
+.upload{border:1.5px dashed #596174;border-radius:16px;padding:20px;text-align:center;background:#12151d;display:block}.upload strong{display:block;margin:5px 0}.upload small{color:var(--muted)}input[type=file]{display:none}.preview{display:none;margin-top:14px;max-height:320px;width:100%;object-fit:contain;border-radius:12px;background:#0d0e13}
 .controls{display:grid;grid-template-columns:1fr;gap:16px}.control{padding-bottom:13px;border-bottom:1px solid #303440}.control:last-child{border:0;padding-bottom:0}.controltop{display:flex;justify-content:space-between;align-items:center;margin-bottom:9px;font-size:14px}.val{color:var(--accent);font-variant-numeric:tabular-nums;font-weight:800}
-input[type=range]{width:100%;accent-color:var(--accent)}.hint{color:var(--muted);font-size:12px;line-height:1.6}
-.result{display:grid;grid-template-columns:1fr 1fr;gap:10px}.metric{background:#12151d;border:1px solid var(--line);border-radius:13px;padding:13px}.metric span{display:block;color:var(--muted);font-size:11px;margin-bottom:6px}.metric strong{font-size:20px;color:var(--accent);font-variant-numeric:tabular-nums}
-.actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}.foot{color:#707789;text-align:center;font-size:11px;margin-top:26px;line-height:1.7}
+input[type=range]{width:100%;accent-color:var(--accent)}.hint{color:var(--muted);font-size:12px;line-height:1.6}.status{padding:11px 13px;border-radius:11px;background:#12151d;color:var(--muted);font-size:13px;line-height:1.6;margin:12px 0}.status.ok{color:#d6ff9b;border:1px solid #52703c}.status.error{color:#ffb6b6;border:1px solid #7a4545}
+.result{display:grid;grid-template-columns:1fr 1fr;gap:10px}.metric{background:#12151d;border:1px solid var(--line);border-radius:13px;padding:13px}.metric span{display:block;color:var(--muted);font-size:11px;margin-bottom:6px}.metric strong{font-size:20px;color:var(--accent);font-variant-numeric:tabular-nums}.actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}.foot{color:#707789;text-align:center;font-size:11px;margin-top:26px;line-height:1.7}
 @media(min-width:620px){.controls{grid-template-columns:1fr 1fr}.wrap{padding-top:36px}.card{padding:22px}}
 </style>
 </head>
 <body>
 <main class="wrap">
-  <header class="top"><div class="brand">WILDS / FACE LAB</div><div class="version">PROTOTYPE v0.1</div></header>
+  <header class="top"><div class="brand">WILDS / FACE LAB</div><div class="version">HAIR EDITOR v0.3</div></header>
   <p class="eyebrow">FACE CONFIGURATION STUDIO</p>
-  <h1>Build your<br>face profile.</h1>
-  <p class="sub">写真を読み込み、各パラメータを調整して自分のフェイス設定を作成。<br>このバージョンは操作確認用のローカル試作版です。</p>
+  <h1>写真から<br>顔の特徴を測る。</h1>
+  <p class="sub">顔写真から目・鼻・口・輪郭の位置関係を抽出する試験版です。ここで測定した特徴量を、次の段階でワイルズの実際の編集項目へ対応付けます。</p>
 
   <section class="card">
     <h2>01 / PROFILE</h2>
@@ -42,44 +41,70 @@ input[type=range]{width:100%;accent-color:var(--accent)}.hint{color:var(--muted)
   <section class="card">
     <h2>02 / FACE IMAGE</h2>
     <label class="upload" for="photo">
-      <div style="font-size:27px">＋</div><strong>写真を選択</strong><small>JPG / PNG / HEIC（端末が対応する形式）</small>
+      <div style="font-size:27px">＋</div><strong>写真を選択</strong><small>正面・無表情・顔全体が写ったJPG / PNGを推奨</small>
       <input id="photo" type="file" accept="image/*">
     </label>
     <img id="preview" class="preview" alt="選択した顔写真のプレビュー">
-    <p class="hint">写真はこの画面内でプレビューするだけで、サーバーには送信しません。</p>
+    <p class="hint">写真データはブラウザ内で処理し、画像そのものをサーバーへ送信しません。初回は解析ライブラリと学習モデルを外部CDNから読み込みます。</p>
   </section>
 
   <section class="card">
-    <h2>03 / FACE PARAMETERS</h2>
+    <h2>03 / LOCAL FACE ANALYSIS</h2>
+    <button class="btn primary" id="analyze" type="button" disabled>顔の特徴を解析</button>
+    <div class="status" id="analysisStatus" role="status" aria-live="polite">写真を選択すると解析できます。正面に近い写真ほど測定が安定します。</div>
+    <div class="result" id="analysisResult" aria-live="polite"></div>
+    <p class="hint" style="margin-bottom:0">表示値は顔ランドマーク間の比率です。ゲーム内スライダー値ではありません。斜め顔・強い表情・髪や手による隠れがあると誤差が増えます。</p>
+  </section>
+
+  <section class="card">
+    <h2>04 / HAIR EDIT (髪)</h2>
+    <p class="hint">動画で確認した女性ハンターの髪型タイプ1〜41を選択できます。41は動画内で確認できた番号であり、ゲーム内の最大番号とは限りません。髪の長さは暫定0〜10の操作範囲です。</p>
     <div class="controls" id="controls"></div>
+    <p class="hint">各項目の「− 1」「＋ 1」で1段階ずつ調整できます。男性の髪型番号への適用は未確認です。髪型の画像プレビュー・写真からの髪型自動判定は未実装です。色の設定は今回含めていません。</p>
   </section>
 
   <section class="card">
-    <h2>04 / PROFILE OUTPUT</h2>
+    <h2>05 / HAIR SETTINGS OUTPUT</h2>
     <div class="result" id="result"></div>
     <div class="actions">
-      <button class="btn primary" id="copy" type="button">数値をコピー</button>
+      <button class="btn primary" id="copy" type="button">設定をコピー</button>
       <button class="btn" id="save" type="button">JSONを保存</button>
     </div>
-    <p class="hint" style="margin-bottom:0">表示される数値は手動調整用のサンプル値です。写真から顔を自動解析するAI機能はまだ搭載していません。</p>
+    <p class="hint" style="margin-bottom:0">髪のタイプは手動選択です。髪の長さの最小・最大値はゲーム画面との追加照合が必要です。</p>
   </section>
-  <p class="foot">WILDS FACE LAB · Prototype<br>All adjustments are illustrative settings, not biometric measurements.</p>
+  <p class="foot">WILDS FACE LAB · Local analysis experiment<br>Face photos are processed in this browser; game-slider mapping is not implemented yet.</p>
 </main>
 <script>
 const definitions=[
-  {id:"outline",label:"輪郭 / Face outline",min:0,max:100,value:50},
-  {id:"eyes",label:"目の印象 / Eyes",min:0,max:100,value:50},
-  {id:"nose",label:"鼻の印象 / Nose",min:0,max:100,value:50},
-  {id:"mouth",label:"口の印象 / Mouth",min:0,max:100,value:50},
-  {id:"balance",label:"顔全体のバランス / Balance",min:0,max:100,value:50},
-  {id:"sharpness",label:"シャープさ / Sharpness",min:0,max:100,value:50}
+  {id:"hairType",label:"髪のタイプ",min:1,max:41,value:1},
+  {id:"hairLength1",label:"髪の長さ（設定1）",min:0,max:10,value:10},
+  {id:"hairLength2",label:"髪の長さ（設定2）",min:0,max:10,value:10}
 ];
 let values=Object.fromEntries(definitions.map(x=>[x.id,x.value]));
 let gender="MEN";
+let selectedFileUrl=null;
+let faceLandmarker=null;
+let measuredMetrics=null;
 const controls=document.getElementById("controls"),result=document.getElementById("result");
+const preview=document.getElementById("preview");
+const analyzeButton=document.getElementById("analyze");
+const analysisStatus=document.getElementById("analysisStatus");
+const analysisResult=document.getElementById("analysisResult");
+function updateHairValue(id, next){
+ const d=definitions.find(item=>item.id===id);
+ if(!d || !Number.isFinite(next))return;
+ values[id]=Math.max(d.min,Math.min(d.max,Math.round(next)));
+ document.getElementById(id).value=values[id];
+ document.getElementById(id+"Val").textContent=values[id];
+ renderResult();
+}
 function render(){
- controls.innerHTML=definitions.map(d=>`<div class="control"><div class="controltop"><label for="${d.id}">${d.label}</label><span class="val" id="${d.id}Val">${values[d.id]}</span></div><input id="${d.id}" type="range" min="${d.min}" max="${d.max}" value="${values[d.id]}" aria-label="${d.label}"></div>`).join("");
- definitions.forEach(d=>document.getElementById(d.id).addEventListener("input",e=>{values[d.id]=Number(e.target.value);document.getElementById(d.id+"Val").textContent=values[d.id];renderResult()}));
+ controls.innerHTML=definitions.map(d=>`<div class="control"><div class="controltop"><label for="${d.id}">${d.label}</label><span class="val" id="${d.id}Val">${values[d.id]}</span></div><input id="${d.id}" type="range" min="${d.min}" max="${d.max}" value="${values[d.id]}" aria-label="${d.label}"><div class="actions"><button class="btn" type="button" id="${d.id}Minus" aria-label="${d.label}を1減らす">− 1</button><button class="btn" type="button" id="${d.id}Plus" aria-label="${d.label}を1増やす">＋ 1</button></div></div>`).join("");
+ definitions.forEach(d=>{
+  document.getElementById(d.id).addEventListener("input",e=>updateHairValue(d.id,Number(e.target.value)));
+  document.getElementById(d.id+"Minus").addEventListener("click",()=>updateHairValue(d.id,values[d.id]-1));
+  document.getElementById(d.id+"Plus").addEventListener("click",()=>updateHairValue(d.id,values[d.id]+1));
+ });
  renderResult();
 }
 function renderResult(){result.innerHTML=definitions.map(d=>`<div class="metric"><span>${d.label.split(" / ")[0]}</span><strong>${values[d.id]}</strong></div>`).join("")}
@@ -87,162 +112,55 @@ function setGender(g){gender=g;document.getElementById("male").classList.toggle(
 document.getElementById("male").onclick=()=>setGender("MEN");
 document.getElementById("female").onclick=()=>setGender("WOMEN");
 document.getElementById("reset").onclick=()=>{values=Object.fromEntries(definitions.map(x=>[x.id,x.value]));render()};
-document.getElementById("photo").addEventListener("change",e=>{const f=e.target.files[0];if(!f)return;const img=document.getElementById("preview");img.src=URL.createObjectURL(f);img.style.display="block"});
-function payload(){return {app:"WILDS FACE LAB",version:"0.1",profile:gender,parameters:values,note:"Sample manual settings; not AI facial analysis."}}
-document.getElementById("copy").onclick=async()=>{const text=JSON.stringify(payload(),null,2);try{await navigator.clipboard.writeText(text);alert("設定値をコピーしました")}catch(e){prompt("この内容をコピーしてください",text)}};
-document.getElementById("save").onclick=()=>{const blob=new Blob([JSON.stringify(payload(),null,2)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="wilds-face-lab-settings.json";a.click();URL.revokeObjectURL(a.href)};
-render();
-</script>
-</body>
-</html>
-
-
-<script type="module">
-
-import { FaceLandmarker, FilesetResolver }
-
-from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/+esm";
-
-const status = document.createElement("p");
-
-status.id = "aiStatus";
-
-status.style.cssText =
-
-"padding:12px;color:#65d6ad;font-size:14px";
-
-document.querySelector(".card:nth-of-type(2)")
-
-?.appendChild(status);
-
-async function analyzeFace(img) {
-
-  status.textContent = "AI顔分析を準備中...";
-
-  try {
-
-    const vision = await FilesetResolver.forVisionTasks(
-
-      "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm"
-
-    );
-
-    const detector = await FaceLandmarker.createFromOptions(
-
-      vision,
-
-      {
-
-        baseOptions: {
-
-          modelAssetPath:
-
-          "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",
-
-          delegate: "CPU"
-
-        },
-
-        runningMode: "IMAGE",
-
-        numFaces: 1
-
-      }
-
-    );
-
-    const result = detector.detect(img);
-
-    if (!result.faceLandmarks.length) {
-
-      status.textContent = "顔を検出できません。正面写真を試してください。";
-
-      detector.close();
-
-      return;
-
-    }
-
-    const p = result.faceLandmarks[0];
-
-    const dist = (a,b) => Math.hypot(
-
-      p[a].x-p[b].x, p[a].y-p[b].y
-
-    );
-
-    const face = dist(234,454);
-
-    const height = dist(10,152);
-
-    const eye = (dist(33,133)+dist(362,263))/2;
-
-    const nose = dist(98,327);
-
-    const mouth = dist(61,291);
-
-    const jaw = dist(172,397);
-
-    const clamp = n => Math.max(0,Math.min(100,Math.round(n)));
-
-    const estimates = {
-
-      outline: clamp(50+(face/height-0.72)*100),
-
-      eyes: clamp(50+(eye/face-0.13)*300),
-
-      nose: clamp(50+(nose/face-0.16)*300),
-
-      mouth: clamp(50+(mouth/face-0.30)*250),
-
-      balance: clamp(50+(p[1].y-p[168].y)*100),
-
-      sharpness: clamp(50+(jaw/face-0.75)*150)
-
-    };
-
-    Object.entries(estimates).forEach(([id,value]) => {
-
-      const slider = document.getElementById(id);
-
-      if (slider) {
-
-        slider.value = value;
-
-        slider.dispatchEvent(new Event("input",{bubbles:true}));
-
-      }
-
-    });
-
-    status.textContent =
-
-      "顔の特徴を検出しました。6項目に参考値を反映しました。";
-
-    detector.close();
-
-  } catch (error) {
-
-    console.error(error);
-
-    status.textContent =
-
-      "分析に失敗しました。通信環境を確認してください。";
-
-  }
-
-}
-
-document.getElementById("photo").addEventListener("change", e => {
-
-  const file = e.target.files[0];
-
-  if (!file) return;
-
-  const img = document.getElementById("preview");
-
-  img.onload = () => analyzeFace(img);
-
+document.getElementById("photo").addEventListener("change",e=>{
+ const f=e.target.files && e.target.files[0];
+ if(!f)return;
+ if(selectedFileUrl)URL.revokeObjectURL(selectedFileUrl);
+ selectedFileUrl=URL.createObjectURL(f);
+ preview.onload=()=>{analyzeButton.disabled=false;analysisStatus.className="status";analysisStatus.textContent="写真を読み込みました。「顔の特徴を解析」を押してください。";analysisResult.innerHTML="";measuredMetrics=null};
+ preview.onerror=()=>{analyzeButton.disabled=true;analysisStatus.className="status error";analysisStatus.textContent="画像を読み込めませんでした。JPGまたはPNGで試してください。"};
+ preview.src=selectedFileUrl;preview.style.display="block";
 });
-
-</script>
+function distance(a,b){return Math.hypot(a.x-b.x,a.y-b.y)}
+function average(values){return values.reduce((s,v)=>s+v,0)/values.length}
+function pct(n,d){return d>0?(n/d)*100:0}
+function fmt(n){return `${n.toFixed(1)}%`}
+function metric(label,value){return `<div class="metric"><span>${label}</span><strong>${fmt(value)}</strong></div>`}
+async function loadFaceLandmarker(){
+ if(faceLandmarker)return faceLandmarker;
+ analysisStatus.className="status";
+ analysisStatus.textContent="解析モデルを読み込んでいます。初回は少し時間がかかります。";
+ const {FilesetResolver,FaceLandmarker}=await import("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/+esm");
+ const vision=await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm");
+ faceLandmarker=await FaceLandmarker.createFromOptions(vision,{
+  baseOptions:{modelAssetPath:"https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task",delegate:"CPU"},
+  runningMode:"IMAGE",numFaces:1,outputFaceBlendshapes:false
+ });
+ return faceLandmarker;
+}
+analyzeButton.addEventListener("click",async()=>{
+ if(!preview.complete||!preview.naturalWidth){analysisStatus.className="status error";analysisStatus.textContent="先に顔写真を選択してください。";return}
+ analyzeButton.disabled=true;
+ try{
+  const landmarker=await loadFaceLandmarker();
+  analysisStatus.textContent="顔の位置を解析しています…";
+  const detection=landmarker.detect(preview);
+  if(!detection.faceLandmarks||detection.faceLandmarks.length===0){throw new Error("顔を検出できませんでした。顔全体が正面から写った写真で試してください。")}
+  const p=detection.faceLandmarks[0];
+  const faceWidth=distance(p[234],p[454]);
+  const faceHeight=distance(p[10],p[152]);
+  const eyeWidth=average([distance(p[33],p[133]),distance(p[362],p[263])]);
+  const eyeOpen=average([distance(p[159],p[145]),distance(p[386],p[374])]);
+  const eyeGap=distance(p[133],p[362]);
+  const noseWidth=distance(p[98],p[327]);
+  const noseLength=distance(p[168],p[1]);
+  const mouthWidth=distance(p[61],p[291]);
+  const mouthHeight=distance(p[13],p[14]);
+  const jawWidth=distance(p[172],p[397]);
+  const chinLength=distance(p[14],p[152]);
+  const metrics=[
+   ["目の横幅（顔幅比）",pct(eyeWidth,faceWidth)],
+   ["目の開き（目幅比）",pct(eyeOpen,eyeWidth)],
+   ["左右の目の間隔（顔幅比）",pct(eyeGap,faceWidth)],
+   ["鼻幅（顔幅比）",pct(noseWidth,faceWidth)],
+   ["鼻の長さ（顔高比）",pct(noseLength,
