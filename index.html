@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#101116">
-<title>WILDS FACE LAB</title>
+<title>WILDS FACE LAB v0.5.6</title>
 <style>
 :root{color-scheme:dark;--bg:#101116;--panel:#191b23;--panel2:#20232d;--line:#343846;--muted:#9ba2b3;--text:#f5f6fa;--accent:#b7f36b;--accent2:#d6ff9b}
 *{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 80% -10%,#30384a 0,transparent 34%),var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
@@ -58,15 +58,23 @@ input[type=range]{width:100%;accent-color:var(--accent)}.hint{color:var(--muted)
     <p class="hint" style="margin-bottom:0">表示値は顔ランドマーク間の比率です。ゲーム内スライダー値ではありません。斜め顔・強い表情・髪や手による隠れがあると誤差が増えます。</p>
   </section>
 
+  <section class="card" id="shapePanel">
+    <h2>04 / FACE SHAPE（形状優先）</h2>
+    <p class="hint">アップロードした人物写真の形状を測定します。肌・髪・瞳などの色は評価しません。測定比率とゲーム内設定値は別物です。根拠のない数値は自動入力しません。</p>
+    <div class="status" id="shapeStatus">写真を選択して「顔の特徴を解析」を押してください。</div>
+    <div class="result" id="shapeResult"></div>
+    <button class="btn" type="button" id="copyShape" disabled>形状測定結果をコピー</button>
+  </section>
   <section class="card" id="eyePanel">
     <h2>04 / EYE MEASUREMENTS（目元）</h2>
-    <p class="hint">「顔の特徴を解析」を実行すると、左右それぞれの目の幅・開き・目尻の傾きと、左右差を表示します。ゲーム内では左右共通の設定値です。左右を別々に測定した値は平均して比較します。校正記録が十分な場合のみ実験的な推定値を表示します。</p>
+    <p class="hint">「顔の特徴を解析」を実行すると、左右それぞれの目の幅・開き・目尻の傾きと、左右差を表示します。ゲーム内では左右共通の設定値です。左右を別々に測定した値は平均して比較します。写真の形状から暫定的なゲーム内設定候補を自動計算します。実際のゲームとの対応は未検証です。画像の撮影条件が違うと精度は保証できません。</p>
     <div class="status" id="eyeStatus" role="status" aria-live="polite">顔写真を選択して、顔の特徴を解析してください。</div>
     <div class="result" id="eyeResult" aria-live="polite"></div>
     <p class="hint">角度は画像平面上の値です。顔の傾き・表情・撮影角度に影響されるため、正面・無表情の写真を推奨します。</p>
-    <h3 style="font-size:15px;margin:20px 0 8px">ゲーム内の目元設定（動画から確認）</h3>
-    <p class="hint">以下は動画で読めた正式な項目名です。左右共通の設定値を表示します。3段階以上の整合する校正記録がある項目だけ実験的に推定します。動画の20などは撮影時の値であり、推奨値・最大値ではありません。</p>
+    <h3 style="font-size:15px;margin:20px 0 8px">写真から作る目もと設定レシピ（暫定）</h3>
+    <p class="hint">02 / FACE IMAGEで選んだ写真を解析し、目元の形状からゲーム内入力候補を算出します。0〜20は今回の暫定的な換算範囲であり、ゲーム内の正式な上限や正解値を保証しません。目の奥行き・二重まぶたは保留します。</p>
     <div class="result" id="eyeGameMapping"></div>
+    <button class="btn" type="button" id="copyEyeRecipe" disabled>目もとレシピをコピー</button>
 
   </section>
   <section class="card">
@@ -97,11 +105,11 @@ input[type=range]{width:100%;accent-color:var(--accent)}.hint{color:var(--muted)
     <p class="hint">各項目の「− 1」「＋ 1」で1段階ずつ調整できます。男性の髪型番号への適用は未確認です。髪型の参考画像は正面に近い4種類のみです。写真からの髪型推定は実験段階です。色の設定は今回含めていません。</p>
   </section>
 
-  <section class="card">
+  <section class="card" id="advancedCalibration" hidden>
     <h2>05A / EYE CALIBRATION LOG（目元の校正記録）</h2>
     <p class="hint">ゲーム画面で実際に設定した値を記録する実験用フォームです。写真の測定値と組み合わせてJSONに保存します。ゲーム内の値を自動推定する機能ではありません。</p>
     <div class="controls">
-      <div class="control"><label for="eyeCalItem">ゲーム内項目</label><select id="eyeCalItem" class="btn" style="width:100%;margin-top:8px"><option>目の幅</option><option>目の高さ</option><option>目の角度</option></select></div>
+      <div class="control"><label for="eyeCalItem">ゲーム内項目</label><select id="eyeCalItem" class="btn" style="width:100%;margin-top:8px"><option>目の幅</option><option>目の高さ</option><option>目の角度</option><option>目の大きさ</option><option>目頭の高さ</option><option>目尻の高さ</option><option>上まぶたの高さ</option><option>上まぶたの角度</option><option>下まぶたの高さ</option><option>下まぶたの角度</option><option>二重まぶたの幅</option><option>二重まぶたの角度</option></select></div>
       <div class="control"><label for="eyeCalValue">ゲーム内で確認した設定値</label><input id="eyeCalValue" type="number" inputmode="numeric" step="1" placeholder="実際の数値を入力" style="width:100%;margin-top:8px;padding:12px;background:#12151d;color:white;border:1px solid #596174;border-radius:10px"></div>
     </div>
     <button class="btn" type="button" id="addEyeSample" style="margin-top:12px">測定値と設定値を記録</button>
@@ -125,7 +133,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}.hint{color:var(--muted)
     </div>
     <p class="hint" style="margin-bottom:0">髪のタイプは手動選択です。髪の長さの最小・最大値はゲーム画面との追加照合が必要です。</p>
   </section>
-  <p class="foot">WILDS FACE LAB · Local analysis experiment<br>Face photos are processed in this browser; game-slider mapping is not implemented yet.</p>
+  <p class="foot">WILDS FACE LAB · Local analysis experiment<br>Face photos are processed in this browser; slider mapping is experimental and requires calibration.</p>
 </main>
 <script>
 const definitions=[
@@ -265,7 +273,7 @@ function estimateEyeGameValue(item){
  const groups=new Map();
  for(const sample of raw){if(!groups.has(sample.gameValue))groups.set(sample.gameValue,[]);groups.get(sample.gameValue).push(sample.measurements[key].value)}
  const anchors=[...groups].map(([game,arr])=>({game,feature:arr.reduce((a,b)=>a+b,0)/arr.length})).sort((a,b)=>a.game-b.game);
- if(anchors.length<3)return null;
+ if(anchors.length<2)return null;
  const diffs=anchors.slice(1).map((a,i)=>a.feature-anchors[i].feature);
  if(diffs.some(d=>Math.abs(d)<0.001))return null;
  if(!(diffs.every(d=>d>0)||diffs.every(d=>d<0)))return null;
@@ -280,6 +288,24 @@ function estimateEyeGameValue(item){
  }
  return null;
 }
+// Photo-first, explicitly uncalibrated shape-to-slider starting points.
+// These broad ranges are design hypotheses, NOT measured Wilds slider endpoints.
+const provisionalEyeRanges={
+ "目の大きさ":[3.5,9.5], "目の高さ":[34,48], "目の幅":[18,29],
+ "目の角度":[-13,13], "目頭の高さ":[34,49], "目尻の高さ":[34,49],
+ "上まぶたの高さ":[24,65], "上まぶたの角度":[-45,45],
+ "下まぶたの高さ":[24,65], "下まぶたの角度":[-45,45]
+};
+function provisionalPhotoEyeValue(name){
+ const m=eyeCalibrationMeasurements?.measurements;
+ const key=eyeFeatureKeys[name];
+ if(!m||!key||!provisionalEyeRanges[name])return null;
+ const n=m[key]?.value;
+ if(!Number.isFinite(n))return null;
+ const [lo,hi]=provisionalEyeRanges[name];
+ const v=Math.round(Math.max(0,Math.min(20,(n-lo)/(hi-lo)*20)));
+ return {value:v,kind:"photo-heuristic",measurement:n,unit:m[key].unit};
+}
 function renderEyeGameMapping(){
  const panel=document.getElementById("eyeGameMapping");
  if(!panel)return;
@@ -287,17 +313,28 @@ function renderEyeGameMapping(){
  for(const [name,feature] of verifiedEyeSettings){
   const card=document.createElement("div");card.className="metric";
   const label=document.createElement("span");label.textContent=name;
-  const estimate=estimateEyeGameValue(name);
-  const value=document.createElement("strong");value.textContent=estimate?String(estimate.value)+"（実験値）":"未算出";value.style.fontSize="15px";
+  const estimate=provisionalPhotoEyeValue(name) || estimateEyeGameValue(name);
+  const value=document.createElement("strong");value.textContent=estimate?String(estimate.value)+" / 20（試算）":"未算出";value.style.fontSize="15px";
   const note=document.createElement("div");note.className="hint";
   const proxyKey=eyeFeatureKeys[name];
   const proxy=proxyKey&&eyeCalibrationMeasurements?.measurements?.[proxyKey];
-  note.textContent=estimate?`左右共通・${estimate.anchors}段階の入力済み校正記録から補間。記録の正しさは未検証。設定範囲 ${estimate.range.join("〜")} 内のみ。` : name==="目の奥行き" ? "正面写真からは推定不可（保留）" : proxy ? `写真から測定：${proxy.value.toFixed(2)}${proxy.unit}／ゲーム内数値への変換は未校正` : "対応候補: "+feature+"／校正不足または不整合";
+  note.textContent=estimate?.kind==="photo-heuristic" ? `写真の測定値 ${estimate.measurement.toFixed(2)}${estimate.unit} から暫定換算。実ゲームとの対応は未検証。` : estimate ? "保存済みの比較記録からの暫定補間（未検証）" : name==="目の奥行き" ? "正面写真では判定できないため保留" : name.startsWith("二重まぶた") ? "二重の折り目を安定して検出できないため保留" : proxy ? `測定値 ${proxy.value.toFixed(2)}${proxy.unit}／換算不可` : "写真からの算出は保留";
   if(estimate)eyeGameEstimates[name]=estimate.value;
   card.append(label,value,note);panel.appendChild(card);
  }
+ document.getElementById("copyEyeRecipe").disabled=!eyeCalibrationMeasurements;
 }
 renderEyeGameMapping();
+document.getElementById("copyEyeRecipe").addEventListener("click",async()=>{
+ const lines=["モンスターハンターワイルズ 目もと形状レシピ（写真からの暫定試算・未検証）",...verifiedEyeSettings.map(([name])=>`${name}: ${eyeGameEstimates[name]??"保留"}`),"※0〜20の暫定換算。ゲーム内の正式な範囲・再現精度は未確認。色は対象外。"];
+ const txt=lines.join("\n");
+ try{await navigator.clipboard.writeText(txt)}catch(e){const el=document.createElement("textarea");el.value=txt;document.body.appendChild(el);el.select();document.execCommand("copy");el.remove()}
+});
+document.getElementById("copyShape").addEventListener("click",async()=>{
+ const data=window.latestShapeMeasurements;if(!data)return;
+ const lines=data.map(x=>`${x.name}: ${x.value}${x.unit}（${x.gameCategory}／ゲーム値未算出）`).join("\n");
+ try{await navigator.clipboard.writeText(lines);document.getElementById("shapeStatus").textContent="測定結果をコピーしました。"}catch(e){document.getElementById("shapeStatus").textContent="コピーできませんでした。ブラウザの権限を確認してください。"}
+});
 analyzeButton.addEventListener("click",async()=>{
  if(!preview.complete||!preview.naturalWidth){analysisStatus.className="status error";analysisStatus.textContent="先に顔写真を選択してください。";return}
  analyzeButton.disabled=true;
@@ -363,11 +400,35 @@ analyzeButton.addEventListener("click",async()=>{
   eyeCalibrationMeasurements={method:"MediaPipe FaceLandmarker image-plane ratios",cameraOrientation:"image-left/right; not anatomical left/right",status:"uncalibrated; not game slider values",measurements:Object.fromEntries(eyeMeasurements.map(([name,value,unit])=>[name,{value:Number(value.toFixed(3)),unit}]))};
   renderEyeGameMapping();
   document.getElementById("eyeResult").innerHTML=eyeMeasurements.map(([label,value,unit])=>`<div class="metric"><span>${label}</span><strong>${value.toFixed(1)}${unit}</strong></div>`).join("");
-  document.getElementById("eyeStatus").textContent="左右別の目元特徴量を測定しました（ゲーム内設定値ではありません）。";
+  document.getElementById("eyeStatus").textContent="写真から目元形状を測定し、暫定レシピを算出しました。";
   measuredMetrics=Object.fromEntries(metrics.map(([label,value])=>[label,Number(value.toFixed(2))]));
   analysisResult.innerHTML=metrics.map(([label,value])=>metric(label,value)).join("");
+  const shapeRows=[
+   ["顔の縦横比",pct(faceHeight,faceWidth),"%","顔の輪郭"],
+   ["下顎の幅",pct(jawWidth,faceWidth),"%","顎・輪郭"],
+   ["顎先までの長さ",pct(chinLength,faceHeight),"%","顎"],
+   ["両目の間隔",pct(eyeGap,faceWidth),"%","目の間隔"],
+   ["目の横幅",pct(eyeWidth,faceWidth),"%","目の幅"],
+   ["目の開き",pct(eyeOpen,eyeWidth),"%","目の大きさ・まぶた"],
+   ["鼻の幅",pct(noseWidth,faceWidth),"%","鼻の幅"],
+   ["鼻の長さ",pct(noseLength,faceHeight),"%","鼻の長さ"],
+   ["口の幅",pct(mouthWidth,faceWidth),"%","口の幅"],
+   ["唇の開き",pct(mouthHeight,mouthWidth),"%","唇・口"],
+  ];
+  window.latestShapeMeasurements=shapeRows.map(([name,value,unit,gameCategory])=>({name,value:Number(value.toFixed(2)),unit,gameCategory,gameValue:null,status:"ゲーム値未校正"}));
+  document.getElementById("shapeResult").replaceChildren();
+  for(const row of window.latestShapeMeasurements){
+   const el=document.createElement("div");el.className="metric";
+   const label=document.createElement("span");label.textContent=row.name+" / "+row.gameCategory;
+   const val=document.createElement("strong");val.textContent=row.value.toFixed(1)+row.unit;
+   const note=document.createElement("small");note.className="hint";note.textContent="ゲーム内設定値：未算出";
+   el.append(label,val,note);document.getElementById("shapeResult").appendChild(el);
+  }
+  document.getElementById("shapeStatus").textContent="形状10指標を測定しました。色は対象外。ゲーム値は検証できた項目のみ今後反映します。";
+  document.getElementById("copyShape").disabled=false;
+
   analysisStatus.className="status ok";
-  analysisStatus.textContent="顔を検出しました。左右の測定結果から共通の目元設定値を照合します。十分な校正記録がない項目は未算出です。";
+  analysisStatus.textContent="顔を検出しました。左右の測定結果から共通の目元設定値を照合します。試算値は実ゲームとの一致が未検証です。";
  }catch(error){
   analysisStatus.className="status error";
   analysisStatus.textContent=error&&error.message?error.message:"解析中にエラーが発生しました。通信環境を確認して再試行してください。";
@@ -562,7 +623,7 @@ document.getElementById("eyeImportFile").addEventListener("change",async event=>
  }catch(e){status.textContent=`読み込み失敗：${e.message}`;}
  finally{event.target.value="";}
 });
-function payload(){return {app:"WILDS FACE LAB",version:"0.5.2-eye-estimate-state-fix",profile:gender,hair:{type:values.hairType,lengthSetting1:values.hairLength1,lengthSetting2:values.hairLength2},hairTypeObservedRange:"1–41 in uploaded video; maximum unverified",hairLengthRangeStatus:"0–10 provisional; verify in game",faceMeasurements:measuredMetrics,eyeCalibration:eyeCalibrationMeasurements,eyeCalibrationSamples:eyeCalibrationSamples,eyeGameSettings:verifiedEyeSettings.map(([name])=>({name,value:eyeGameEstimates[name]??null,status:name in eyeGameEstimates?"experimental_unverified_interpolation":"uncalibrated"})),faceAnalysisStatus:measuredMetrics?"measured":"not_run",note:"Experimental uncalibrated joint ranking of 4 types and candidate-specific lengths. Scores are not probabilities. 0–10 provisional."}}
+function payload(){return {app:"WILDS FACE LAB",version:"0.5.6-photo-recipe",profile:gender,hair:{type:values.hairType,lengthSetting1:values.hairLength1,lengthSetting2:values.hairLength2},hairTypeObservedRange:"1–41 in uploaded video; maximum unverified",hairLengthRangeStatus:"0–10 provisional; verify in game",faceMeasurements:measuredMetrics,shapeMeasurements:window.latestShapeMeasurements||null,eyeCalibration:eyeCalibrationMeasurements,eyeCalibrationSamples:eyeCalibrationSamples,eyeGameSettings:verifiedEyeSettings.map(([name])=>({name,value:eyeGameEstimates[name]??null,status:name in eyeGameEstimates?"photo_shape_heuristic_unverified":"undetermined"})),faceAnalysisStatus:measuredMetrics?"measured":"not_run",note:"Experimental uncalibrated joint ranking of 4 types and candidate-specific lengths. Scores are not probabilities. 0–10 provisional."}}
 document.getElementById("copy").onclick=async()=>{const text=JSON.stringify(payload(),null,2);try{await navigator.clipboard.writeText(text);alert("設定メモをコピーしました")}catch(e){prompt("この内容をコピーしてください",text)}};
 document.getElementById("save").onclick=()=>{const blob=new Blob([JSON.stringify(payload(),null,2)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="wilds-face-calibration.json";a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)};
 window.addEventListener("beforeunload",()=>{if(selectedFileUrl)URL.revokeObjectURL(selectedFileUrl);if(faceLandmarker)faceLandmarker.close()});
