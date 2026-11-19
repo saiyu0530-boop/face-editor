@@ -23,7 +23,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}.hint{color:var(--muted)
 </head>
 <body>
 <main class="wrap">
-  <header class="top"><div class="brand">WILDS / FACE LAB</div><div class="version">FACE + HAIR v0.4.8</div></header>
+  <header class="top"><div class="brand">WILDS / FACE LAB</div><div class="version">FACE + HAIR v0.5.3</div></header>
   <p class="eyebrow">FACE CONFIGURATION STUDIO</p>
   <h1>写真から<br>顔の特徴を測る。</h1>
   <p class="sub">顔写真から目・鼻・口・輪郭の位置関係を抽出する試験版です。ここで測定した特徴量を、次の段階でワイルズの実際の編集項目へ対応付けます。</p>
@@ -186,8 +186,9 @@ document.getElementById("photo").addEventListener("change",e=>{
  if(!f)return;
  if(selectedFileUrl)URL.revokeObjectURL(selectedFileUrl);
  selectedFileUrl=URL.createObjectURL(f);
- preview.onload=()=>{document.getElementById("suggestHair").disabled=false;document.getElementById("applyHair").disabled=true;proposedHair=null;candidateOptions=[];document.getElementById("hairCandidateList").hidden=true;document.getElementById("hairSuggestStatus").textContent="写真を読み込みました。推定できます。";analyzeButton.disabled=false;analysisStatus.className="status";analysisStatus.textContent="写真を読み込みました。「顔の特徴を解析」を押してください。";analysisResult.innerHTML="";document.getElementById("eyeResult").innerHTML="";document.getElementById("eyeStatus").textContent="顔の特徴を解析すると目元の測定値が表示されます。";measuredMetrics=null;eyeCalibrationMeasurements=null};
- preview.onerror=()=>{document.getElementById("suggestHair").disabled=true;analyzeButton.disabled=true;analysisStatus.className="status error";analysisStatus.textContent="画像を読み込めませんでした。JPGまたはPNGで試してください。"};
+ measuredMetrics=null;eyeCalibrationMeasurements=null;renderEyeGameMapping();
+ preview.onload=()=>{document.getElementById("suggestHair").disabled=false;document.getElementById("applyHair").disabled=true;proposedHair=null;candidateOptions=[];document.getElementById("hairCandidateList").hidden=true;document.getElementById("hairSuggestStatus").textContent="写真を読み込みました。推定できます。";analyzeButton.disabled=false;analysisStatus.className="status";analysisStatus.textContent="写真を読み込みました。「顔の特徴を解析」を押してください。";analysisResult.innerHTML="";document.getElementById("eyeResult").innerHTML="";document.getElementById("eyeStatus").textContent="顔の特徴を解析すると目元の測定値が表示されます。";measuredMetrics=null;eyeCalibrationMeasurements=null;renderEyeGameMapping();};
+ preview.onerror=()=>{measuredMetrics=null;eyeCalibrationMeasurements=null;renderEyeGameMapping();document.getElementById("suggestHair").disabled=true;analyzeButton.disabled=true;analysisStatus.className="status error";analysisStatus.textContent="画像を読み込めませんでした。JPGまたはPNGで試してください。"};
  preview.src=selectedFileUrl;preview.style.display="block";
 });
 function distance(a,b){return Math.hypot(a.x-b.x,a.y-b.y)}
@@ -246,7 +247,14 @@ const verifiedEyeSettings=[
 const eyeFeatureKeys={
  "目の幅":"目の横幅（顔幅比）",
  "目の高さ":"目の中心高さ（顔高比）",
- "目の角度":"目尻の傾き"
+ "目の角度":"目尻の傾き",
+ "目の大きさ":"目の大きさ・開口面積近似",
+ "目頭の高さ":"目頭の高さ（顔高比）",
+ "目尻の高さ":"目尻の高さ（顔高比）",
+ "上まぶたの高さ":"上まぶたの高さ（目幅比）",
+ "上まぶたの角度":"上まぶたの角度",
+ "下まぶたの高さ":"下まぶたの高さ（目幅比）",
+ "下まぶたの角度":"下まぶたの角度"
 };
 function estimateEyeGameValue(item){
  const key=eyeFeatureKeys[item];
@@ -282,7 +290,9 @@ function renderEyeGameMapping(){
   const estimate=estimateEyeGameValue(name);
   const value=document.createElement("strong");value.textContent=estimate?String(estimate.value)+"（実験値）":"未算出";value.style.fontSize="15px";
   const note=document.createElement("div");note.className="hint";
-  note.textContent=estimate?`左右共通・${estimate.anchors}段階の入力済み校正記録から補間。記録の正しさは未検証。設定範囲 ${estimate.range.join("〜")} 内のみ。` : "対応候補: "+feature+"／校正不足または不整合";
+  const proxyKey=eyeFeatureKeys[name];
+  const proxy=proxyKey&&eyeCalibrationMeasurements?.measurements?.[proxyKey];
+  note.textContent=estimate?`左右共通・${estimate.anchors}段階の入力済み校正記録から補間。記録の正しさは未検証。設定範囲 ${estimate.range.join("〜")} 内のみ。` : name==="目の奥行き" ? "正面写真からは推定不可（保留）" : proxy ? `写真から測定：${proxy.value.toFixed(2)}${proxy.unit}／ゲーム内数値への変換は未校正` : "対応候補: "+feature+"／校正不足または不整合";
   if(estimate)eyeGameEstimates[name]=estimate.value;
   card.append(label,value,note);panel.appendChild(card);
  }
@@ -330,6 +340,25 @@ analyzeButton.addEventListener("click",async()=>{
    ["画像右・目頭高さ（顔高比）",pct(p[362].y-p[10].y,faceHeight),"%"],
    ["画像右・目尻高さ（顔高比）",pct(p[263].y-p[10].y,faceHeight),"%"]
   ];
+  // Additional image-plane proxies for the in-game eye editor. These are
+  // measurements, NOT calibrated slider predictions.
+  const eyeParts=[
+   {outer:p[33],inner:p[133],top:p[159],bottom:p[145],upperOuter:p[158],lowerOuter:p[153],foldInner:p[160],foldOuter:p[157]},
+   {outer:p[263],inner:p[362],top:p[386],bottom:p[374],upperOuter:p[385],lowerOuter:p[380],foldInner:p[387],foldOuter:p[384]}
+  ];
+  const avgEye=(fn)=>average(eyeParts.map(fn));
+  const norm=(a,b)=>pct(distance(a,b),faceWidth);
+  const tilt=(a,b)=>Math.atan2(a.y-b.y,Math.abs(a.x-b.x))*180/Math.PI;
+  const extraEyeMeasurements=[
+   ["目の大きさ・開口面積近似",avgEye(e=>norm(e.outer,e.inner)*pct(distance(e.top,e.bottom),distance(e.outer,e.inner))),"相対値"],
+   ["目頭の高さ（顔高比）",pct(((p[133].y+p[362].y)/2)-p[10].y,faceHeight),"%"],
+   ["目尻の高さ（顔高比）",pct(((p[33].y+p[263].y)/2)-p[10].y,faceHeight),"%"],
+   ["上まぶたの高さ（目幅比）",avgEye(e=>pct(distance(e.top,e.inner),distance(e.outer,e.inner))),"%"],
+   ["上まぶたの角度",avgEye(e=>tilt(e.upperOuter,e.top)),"°"],
+   ["下まぶたの高さ（目幅比）",avgEye(e=>pct(distance(e.bottom,e.inner),distance(e.outer,e.inner))),"%"],
+   ["下まぶたの角度",avgEye(e=>tilt(e.lowerOuter,e.bottom)),"°"]
+  ];
+  eyeMeasurements.push(...extraEyeMeasurements);
   eyeMeasurements.push(...eyePositionMeasurements);
   eyeCalibrationMeasurements={method:"MediaPipe FaceLandmarker image-plane ratios",cameraOrientation:"image-left/right; not anatomical left/right",status:"uncalibrated; not game slider values",measurements:Object.fromEntries(eyeMeasurements.map(([name,value,unit])=>[name,{value:Number(value.toFixed(3)),unit}]))};
   renderEyeGameMapping();
@@ -533,7 +562,7 @@ document.getElementById("eyeImportFile").addEventListener("change",async event=>
  }catch(e){status.textContent=`読み込み失敗：${e.message}`;}
  finally{event.target.value="";}
 });
-function payload(){return {app:"WILDS FACE LAB",version:"0.5.0-eye-pair-comparison",profile:gender,hair:{type:values.hairType,lengthSetting1:values.hairLength1,lengthSetting2:values.hairLength2},hairTypeObservedRange:"1–41 in uploaded video; maximum unverified",hairLengthRangeStatus:"0–10 provisional; verify in game",faceMeasurements:measuredMetrics,eyeCalibration:eyeCalibrationMeasurements,eyeCalibrationSamples:eyeCalibrationSamples,eyeGameSettings:verifiedEyeSettings.map(([name])=>({name,value:eyeGameEstimates[name]??null,status:name in eyeGameEstimates?"experimental_unverified_interpolation":"uncalibrated"})),faceAnalysisStatus:measuredMetrics?"measured":"not_run",note:"Experimental uncalibrated joint ranking of 4 types and candidate-specific lengths. Scores are not probabilities. 0–10 provisional."}}
+function payload(){return {app:"WILDS FACE LAB",version:"0.5.2-eye-estimate-state-fix",profile:gender,hair:{type:values.hairType,lengthSetting1:values.hairLength1,lengthSetting2:values.hairLength2},hairTypeObservedRange:"1–41 in uploaded video; maximum unverified",hairLengthRangeStatus:"0–10 provisional; verify in game",faceMeasurements:measuredMetrics,eyeCalibration:eyeCalibrationMeasurements,eyeCalibrationSamples:eyeCalibrationSamples,eyeGameSettings:verifiedEyeSettings.map(([name])=>({name,value:eyeGameEstimates[name]??null,status:name in eyeGameEstimates?"experimental_unverified_interpolation":"uncalibrated"})),faceAnalysisStatus:measuredMetrics?"measured":"not_run",note:"Experimental uncalibrated joint ranking of 4 types and candidate-specific lengths. Scores are not probabilities. 0–10 provisional."}}
 document.getElementById("copy").onclick=async()=>{const text=JSON.stringify(payload(),null,2);try{await navigator.clipboard.writeText(text);alert("設定メモをコピーしました")}catch(e){prompt("この内容をコピーしてください",text)}};
 document.getElementById("save").onclick=()=>{const blob=new Blob([JSON.stringify(payload(),null,2)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="wilds-face-calibration.json";a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)};
 window.addEventListener("beforeunload",()=>{if(selectedFileUrl)URL.revokeObjectURL(selectedFileUrl);if(faceLandmarker)faceLandmarker.close()});
