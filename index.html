@@ -60,12 +60,12 @@ input[type=range]{width:100%;accent-color:var(--accent)}.hint{color:var(--muted)
 
   <section class="card" id="eyePanel">
     <h2>04 / EYE MEASUREMENTS（目元）</h2>
-    <p class="hint">「顔の特徴を解析」を実行すると、左右それぞれの目の幅・開き・目尻の傾きと、左右差を表示します。ゲーム内の目元設定値への変換は未実装です。</p>
+    <p class="hint">「顔の特徴を解析」を実行すると、左右それぞれの目の幅・開き・目尻の傾きと、左右差を表示します。ゲーム内では左右共通の設定値です。左右を別々に測定した値は平均して比較します。校正記録が十分な場合のみ実験的な推定値を表示します。</p>
     <div class="status" id="eyeStatus" role="status" aria-live="polite">顔写真を選択して、顔の特徴を解析してください。</div>
     <div class="result" id="eyeResult" aria-live="polite"></div>
     <p class="hint">角度は画像平面上の値です。顔の傾き・表情・撮影角度に影響されるため、正面・無表情の写真を推奨します。</p>
     <h3 style="font-size:15px;margin:20px 0 8px">ゲーム内の目元設定（動画から確認）</h3>
-    <p class="hint">以下は動画で読めた正式な項目名です。設定値の自動変換は、ゲーム内の変化量を校正するまで「未算出」とします。動画の20などは撮影時の値であり、推奨値・最大値ではありません。</p>
+    <p class="hint">以下は動画で読めた正式な項目名です。左右共通の設定値を表示します。3段階以上の整合する校正記録がある項目だけ実験的に推定します。動画の20などは撮影時の値であり、推奨値・最大値ではありません。</p>
     <div class="result" id="eyeGameMapping"></div>
 
   </section>
@@ -107,6 +107,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}.hint{color:var(--muted)
     <button class="btn" type="button" id="addEyeSample" style="margin-top:12px">測定値と設定値を記録</button>
     <div class="status" id="eyeSampleStatus" role="status">写真を解析し、ゲーム内で確認した数値を入力してください。</div>
     <div id="eyeSampleList" class="hint"></div>
+    <div id="eyePairComparison" class="status" role="status" aria-live="polite">同じ項目の記録を2件以上保存すると、設定値と測定値の差を比較できます。</div>
     <div id="eyeCalibrationQuality" class="status" role="status" aria-live="polite">校正データの品質を確認します。</div>
     <div style="margin-top:12px">
       <label for="eyeImportFile" class="hint">以前保存した校正JSONを読み込む（端末内のみ）</label>
@@ -137,6 +138,7 @@ let gender="MEN";
 let selectedFileUrl=null;
 let faceLandmarker=null;
 let eyeCalibrationMeasurements=null;
+let eyeGameEstimates={};
 const eyeCalibrationSamples=[];
 let measuredMetrics=null;
 let proposedHair=null;
@@ -175,7 +177,7 @@ function syncTypeGrid(){
  document.querySelectorAll("#hairTypeGrid button").forEach(b=>{b.setAttribute("aria-pressed",String(Number(b.dataset.type)===values.hairType));});
 }
 function renderResult(){result.innerHTML=definitions.map(d=>`<div class="metric"><span>${d.label.split(" / ")[0]}</span><strong>${values[d.id]}</strong></div>`).join("")}
-function setGender(g){gender=g;document.getElementById("male").classList.toggle("active",g==="MEN");document.getElementById("female").classList.toggle("active",g==="WOMEN");document.getElementById("profileHint").textContent=g+" profile selected"}
+function setGender(g){gender=g;renderEyeGameMapping();renderEyeCalibrationQuality();renderEyePairComparison();document.getElementById("male").classList.toggle("active",g==="MEN");document.getElementById("female").classList.toggle("active",g==="WOMEN");document.getElementById("profileHint").textContent=g+" profile selected"}
 document.getElementById("male").onclick=()=>setGender("MEN");
 document.getElementById("female").onclick=()=>setGender("WOMEN");
 document.getElementById("reset").onclick=()=>{values=Object.fromEntries(definitions.map(x=>[x.id,x.value]));render()};
@@ -238,15 +240,50 @@ const verifiedEyeSettings=[
  ["二重まぶたの幅","まぶたの折り目（写真によって検出困難）"],
  ["二重まぶたの角度","まぶたの折り目の角度（写真によって検出困難）"]
 ];
+// The game has one shared setting for both eyes. Never infer separate game sliders.
+// Interpolate only between user-recorded anchors with a consistent monotonic trend.
+// These records are NOT independently verified; results are experimental, not calibrated truth.
+const eyeFeatureKeys={
+ "目の幅":"目の横幅（顔幅比）",
+ "目の高さ":"目の中心高さ（顔高比）",
+ "目の角度":"目尻の傾き"
+};
+function estimateEyeGameValue(item){
+ const key=eyeFeatureKeys[item];
+ if(!key || !eyeCalibrationMeasurements)return null;
+ const target=eyeCalibrationMeasurements.measurements?.[key]?.value;
+ if(!Number.isFinite(target))return null;
+ const raw=eyeCalibrationSamples.filter(x=>x.profile===gender && x.item===item && Number.isFinite(x.measurements?.[key]?.value));
+ const groups=new Map();
+ for(const sample of raw){if(!groups.has(sample.gameValue))groups.set(sample.gameValue,[]);groups.get(sample.gameValue).push(sample.measurements[key].value)}
+ const anchors=[...groups].map(([game,arr])=>({game,feature:arr.reduce((a,b)=>a+b,0)/arr.length})).sort((a,b)=>a.game-b.game);
+ if(anchors.length<3)return null;
+ const diffs=anchors.slice(1).map((a,i)=>a.feature-anchors[i].feature);
+ if(diffs.some(d=>Math.abs(d)<0.001))return null;
+ if(!(diffs.every(d=>d>0)||diffs.every(d=>d<0)))return null;
+ const ordered=[...anchors].sort((a,b)=>a.feature-b.feature);
+ if(target<ordered[0].feature || target>ordered[ordered.length-1].feature)return null;
+ for(let i=1;i<ordered.length;i++){
+  const lo=ordered[i-1],hi=ordered[i];
+  if(target<=hi.feature){
+   const t=(target-lo.feature)/(hi.feature-lo.feature);
+   return {value:Math.round(lo.game+t*(hi.game-lo.game)),anchors:anchors.length,range:[Math.min(...anchors.map(a=>a.game)),Math.max(...anchors.map(a=>a.game))]};
+  }
+ }
+ return null;
+}
 function renderEyeGameMapping(){
  const panel=document.getElementById("eyeGameMapping");
  if(!panel)return;
- panel.replaceChildren();
+ panel.replaceChildren();eyeGameEstimates={};
  for(const [name,feature] of verifiedEyeSettings){
   const card=document.createElement("div");card.className="metric";
   const label=document.createElement("span");label.textContent=name;
-  const value=document.createElement("strong");value.textContent="未算出";value.style.fontSize="15px";
-  const note=document.createElement("div");note.className="hint";note.textContent="対応候補: "+feature;
+  const estimate=estimateEyeGameValue(name);
+  const value=document.createElement("strong");value.textContent=estimate?String(estimate.value)+"（実験値）":"未算出";value.style.fontSize="15px";
+  const note=document.createElement("div");note.className="hint";
+  note.textContent=estimate?`左右共通・${estimate.anchors}段階の入力済み校正記録から補間。記録の正しさは未検証。設定範囲 ${estimate.range.join("〜")} 内のみ。` : "対応候補: "+feature+"／校正不足または不整合";
+  if(estimate)eyeGameEstimates[name]=estimate.value;
   card.append(label,value,note);panel.appendChild(card);
  }
 }
@@ -284,7 +321,6 @@ analyzeButton.addEventListener("click",async()=>{
   ];
   // MediaPipe Face Mesh landmark measurements; not game slider values.
   // Mapping is descriptive only: never manufacture game slider values from landmark ratios.
-  renderEyeGameMapping();
   const eyeMeasurements=measureEyes(p,faceWidth);
   const faceCenterY=(p[10].y+p[152].y)/2;
   const eyePositionMeasurements=[
@@ -296,12 +332,13 @@ analyzeButton.addEventListener("click",async()=>{
   ];
   eyeMeasurements.push(...eyePositionMeasurements);
   eyeCalibrationMeasurements={method:"MediaPipe FaceLandmarker image-plane ratios",cameraOrientation:"image-left/right; not anatomical left/right",status:"uncalibrated; not game slider values",measurements:Object.fromEntries(eyeMeasurements.map(([name,value,unit])=>[name,{value:Number(value.toFixed(3)),unit}]))};
+  renderEyeGameMapping();
   document.getElementById("eyeResult").innerHTML=eyeMeasurements.map(([label,value,unit])=>`<div class="metric"><span>${label}</span><strong>${value.toFixed(1)}${unit}</strong></div>`).join("");
   document.getElementById("eyeStatus").textContent="左右別の目元特徴量を測定しました（ゲーム内設定値ではありません）。";
   measuredMetrics=Object.fromEntries(metrics.map(([label,value])=>[label,Number(value.toFixed(2))]));
   analysisResult.innerHTML=metrics.map(([label,value])=>metric(label,value)).join("");
   analysisStatus.className="status ok";
-  analysisStatus.textContent="顔を検出しました。目元の位置データも計測しました。保存JSONに校正用データを含めます。ゲーム内スライダー値は未算出です。";
+  analysisStatus.textContent="顔を検出しました。左右の測定結果から共通の目元設定値を照合します。十分な校正記録がない項目は未算出です。";
  }catch(error){
   analysisStatus.className="status error";
   analysisStatus.textContent=error&&error.message?error.message:"解析中にエラーが発生しました。通信環境を確認して再試行してください。";
@@ -407,11 +444,7 @@ document.getElementById("applyHair").addEventListener("click",()=>{
 });
 // A quality gate, not a conversion formula: user-entered records alone cannot
 // establish causal effects of a single in-game slider.
-const eyeFeatureKeys={
- "目の幅":"目の横幅（顔幅比）",
- "目の高さ":"目の中心高さ（顔高比）",
- "目の角度":"目尻の傾き"
-};
+
 function renderEyeCalibrationQuality(){
  const panel=document.getElementById("eyeCalibrationQuality");
  if(!panel)return;
@@ -431,6 +464,21 @@ function renderEyeCalibrationQuality(){
  panel.textContent="校正データの品質チェック（"+gender+"）\n"+lines.join("\n")+"\n※記録数が増えても、ゲーム内スライダーとの因果関係が検証できるまでは推奨値を算出しません。";
  panel.style.whiteSpace="pre-line";
 }
+function renderEyePairComparison(){
+ const panel=document.getElementById("eyePairComparison");
+ if(!panel)return;
+ const lines=[];
+ for(const [item,feature] of Object.entries(eyeFeatureKeys)){
+  const samples=eyeCalibrationSamples.filter(s=>s.item===item && s.profile===gender && Number.isFinite(s.measurements?.[feature]?.value));
+  const distinct=samples.filter((s,i)=>samples.findIndex(t=>t.gameValue===s.gameValue)===i).sort((a,b)=>a.gameValue-b.gameValue);
+  if(distinct.length<2){lines.push(`${item}：比較可能な設定値が2種類未満`);continue;}
+  const first=distinct[0],last=distinct[distinct.length-1];
+  const delta=last.measurements[feature].value-first.measurements[feature].value;
+  lines.push(`${item}：設定 ${first.gameValue} → ${last.gameValue} / 測定 ${first.measurements[feature].value.toFixed(3)} → ${last.measurements[feature].value.toFixed(3)}（差 ${delta>=0?"+":""}${delta.toFixed(3)}）`);
+ }
+ panel.textContent=`校正記録の差分比較（${gender}）\n`+lines.join("\n")+"\n※同じ顔・撮影角度・他の設定値を固定した比較かは未確認です。差分は変換式や推奨値ではありません。";
+ panel.style.whiteSpace="pre-line";
+}
 function renderEyeSamples(){
  const list=document.getElementById("eyeSampleList");
  list.textContent=eyeCalibrationSamples.length?`${eyeCalibrationSamples.length}件の校正記録をJSONに含めます（このページを閉じると消えます）。`:"校正記録はまだありません。";
@@ -447,10 +495,13 @@ document.getElementById("addEyeSample").addEventListener("click",()=>{
  eyeCalibrationSamples.push({item,gameValue:n,measurements:structuredClone(eyeCalibrationMeasurements.measurements),profile:gender,source:"user-entered game value; not independently verified"});
  status.textContent=`${item}：${n} を記録しました。JSON保存で書き出せます。`;
  renderEyeSamples();
+ renderEyeGameMapping();
  renderEyeCalibrationQuality();
+ renderEyePairComparison();
 });
 renderEyeSamples();
 renderEyeCalibrationQuality();
+renderEyePairComparison();
 // Import only the expected calibration records; never execute imported content.
 // Limits protect iPhone Safari from unexpectedly large or malformed JSON files.
 function isValidEyeSample(x){
@@ -478,11 +529,11 @@ document.getElementById("eyeImportFile").addEventListener("change",async event=>
     seen.add(key);added++;
    }
   }
-  renderEyeSamples();renderEyeCalibrationQuality();status.textContent=`${added}件の記録を読み込みました（重複は除外）。ゲーム内数値の自動推定はまだ未校正です。`;
+  renderEyeSamples();renderEyeGameMapping();renderEyeCalibrationQuality();renderEyePairComparison();status.textContent=`${added}件の記録を読み込みました（重複は除外）。整合する3段階以上の校正記録があれば実験値を表示します。`;
  }catch(e){status.textContent=`読み込み失敗：${e.message}`;}
  finally{event.target.value="";}
 });
-function payload(){return {app:"WILDS FACE LAB",version:"0.4.9-eye-calibration-quality",profile:gender,hair:{type:values.hairType,lengthSetting1:values.hairLength1,lengthSetting2:values.hairLength2},hairTypeObservedRange:"1–41 in uploaded video; maximum unverified",hairLengthRangeStatus:"0–10 provisional; verify in game",faceMeasurements:measuredMetrics,eyeCalibration:eyeCalibrationMeasurements,eyeCalibrationSamples:eyeCalibrationSamples,eyeGameSettings:verifiedEyeSettings.map(([name])=>({name,value:null,status:"uncalibrated"})),faceAnalysisStatus:measuredMetrics?"measured":"not_run",note:"Experimental uncalibrated joint ranking of 4 types and candidate-specific lengths. Scores are not probabilities. 0–10 provisional."}}
+function payload(){return {app:"WILDS FACE LAB",version:"0.5.0-eye-pair-comparison",profile:gender,hair:{type:values.hairType,lengthSetting1:values.hairLength1,lengthSetting2:values.hairLength2},hairTypeObservedRange:"1–41 in uploaded video; maximum unverified",hairLengthRangeStatus:"0–10 provisional; verify in game",faceMeasurements:measuredMetrics,eyeCalibration:eyeCalibrationMeasurements,eyeCalibrationSamples:eyeCalibrationSamples,eyeGameSettings:verifiedEyeSettings.map(([name])=>({name,value:eyeGameEstimates[name]??null,status:name in eyeGameEstimates?"experimental_unverified_interpolation":"uncalibrated"})),faceAnalysisStatus:measuredMetrics?"measured":"not_run",note:"Experimental uncalibrated joint ranking of 4 types and candidate-specific lengths. Scores are not probabilities. 0–10 provisional."}}
 document.getElementById("copy").onclick=async()=>{const text=JSON.stringify(payload(),null,2);try{await navigator.clipboard.writeText(text);alert("設定メモをコピーしました")}catch(e){prompt("この内容をコピーしてください",text)}};
 document.getElementById("save").onclick=()=>{const blob=new Blob([JSON.stringify(payload(),null,2)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="wilds-face-calibration.json";a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)};
 window.addEventListener("beforeunload",()=>{if(selectedFileUrl)URL.revokeObjectURL(selectedFileUrl);if(faceLandmarker)faceLandmarker.close()});
