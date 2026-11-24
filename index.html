@@ -23,7 +23,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}.hint{color:var(--muted)
 </head>
 <body>
 <main class="wrap">
-  <header class="top"><div class="brand">WILDS / FACE LAB</div><div class="version">FACE + HAIR v0.5.20</div></header>
+  <header class="top"><div class="brand">WILDS / FACE LAB</div><div class="version">FACE + HAIR v0.5.21</div></header>
   <p class="eyebrow">FACE CONFIGURATION STUDIO</p>
   <h1>写真から<br>顔の特徴を測る。</h1>
   <p class="sub">顔写真から目・鼻・口・輪郭の位置関係を抽出する試験版です。ここで測定した特徴量を、次の段階でワイルズの実際の編集項目へ対応付けます。</p>
@@ -65,7 +65,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}.hint{color:var(--muted)
     <div class="result" id="shapeResult"></div>
     <button class="btn" type="button" id="copyShape" disabled>形状測定結果をコピー</button>
   </section>
-  <section class="card" id="nosePanel"><h2>鼻 / NOSE EDIT</h2><p class="hint">実画像13枚から0・10・20を校正。鼻のブレンドは対象外。正面写真の奥行きは低信頼の近似です。</p><div class="status" id="noseStatus"></div><div class="result" id="noseGameMapping"></div><button class="btn" id="copyNose" type="button">鼻の設定値をコピー</button></section>
+  <section class="card" id="nosePanel"><h2>鼻 / NOSE EDIT</h2><p class="hint">実画像13枚から0・10・20を校正。鼻のブレンドは対象外。正面写真の奥行きは低信頼の近似です。近似度は参考形状との特徴量一致度であり、実機での再現率・正解率ではありません。候補範囲は誤差の近い設定値です。</p><div class="status" id="noseStatus"></div><div class="result" id="noseGameMapping"></div><button class="btn" id="copyNose" type="button">鼻の設定値をコピー</button></section>
   <section class="card" id="eyePanel">
     <h2>04 / EYE MEASUREMENTS（目元）</h2>
     <p class="hint">「顔の特徴を解析」を実行すると、左右それぞれの目の幅・開き・目尻の傾きと、左右差を表示します。ゲーム内では左右共通の設定値です。左右を別々に測定した値は平均して比較します。内蔵のゲーム参考画像を初回解析し、0・10・20の測定値から暫定推定します。画像の撮影条件が違うと精度は保証できません。</p>
@@ -403,9 +403,10 @@ function measureNose(p,W,H){
  const zbase=(q[234].z+q[454].z)/2, width=distance(q[98],q[327]);
  const f=[(mid-eye)/ew,(mouth-mid)/ew,(zbase-q[1].z)/fw,(q[168].z-q[1].z)/fw,(zbase-q[6].z)/fw,(zbase-q[197].z)/fw,(q[2].y-q[1].y)/ew,(mid-q[1].y)/ew,(mid-q[2].y)/ew,((q[98].y+q[327].y)/2-(q[129].y+q[358].y)/2)/ew,width/fw,width/ew];
  const symmetry=Math.min(distance(q[33],q[133]),distance(q[263],q[362]))/Math.max(distance(q[33],q[133]),distance(q[263],q[362]));
- return {f,quality:fw>=120&&symmetry>=.75&&f.every(Number.isFinite)};
+ f.push((q[2].y-eye)/ew,(q[1].y-eye)/ew,(mid-eye)/Math.max(1,mouth-eye), (q[98].y+q[327].y-2*q[2].y)/Math.max(1,width), (q[98].y+q[327].y-q[97].y-q[326].y)/Math.max(1,width), Math.abs(q[98].x-q[327].x)/ew, width/Math.max(1,distance(q[133],q[362])));
+ return {f,quality:fw>=80&&symmetry>=.65&&f.every(Number.isFinite),symmetry};
 }
-const noseFeatures=[[0,1],[2,3],[4,5],[6,7],[8,9],[10,11]];
+const noseFeatures=[[0,1,12,13,14],[2,3],[4,5],[6,7],[8,9,15,16],[10,11,17,18]];
 async function prepareNose(model){
  if(noseAnchors)return;
  const rows={};
@@ -421,19 +422,23 @@ function estimateNose(){
  const base=noseAnchors[7735];
  for(let i=0;i<6;i++){
  const lo=noseAnchors[7734-i*2],hi=noseAnchors[7733-i*2];if(!lo||!hi)continue;
- const votes=[];
+ const priority=[0,4,5].includes(i), features=[];
  for(const k of noseFeatures[i]){
  const a=lo[k],b=base[k],c=hi[k],x=noseTarget.f[k];
- if((b-a)*(c-b)<=0||Math.min(Math.abs(b-a),Math.abs(c-b))<.0015)continue;
- const sign=Math.sign(c-a),left=(x-b)*sign<0;
- const raw=left?10*(x-a)/(b-a):10+10*(x-b)/(c-b);
- if(Number.isFinite(raw))votes.push(raw);
+ const span=Math.max(a,b,c)-Math.min(a,b,c);
+ if(!Number.isFinite(span)||span<(priority?.001:.003))continue;
+ const monotonic=(b-a)*(c-b)>0;
+ if(!priority&&!monotonic)continue;
+ const noise=Math.max(.003,span*.25),weight=(monotonic?1:.35)*Math.min(1,span/.012);
+ features.push({a,b,c,x,noise,weight});
  }
- if(!votes.length)continue;
- if(votes.length>1&&Math.abs(votes[0]-votes[1])>9)continue;
- const raw=votes.reduce((a,b)=>a+b,0)/votes.length;
- if(raw< -10||raw>30)continue;
- out[noseNames[i]]={value:Math.round(Math.max(0,Math.min(20,raw))),outside:raw<0||raw>20,features:votes.length};
+ if(!features.length)continue;
+ const loss=v=>features.reduce((sum,f)=>{const pred=v<=10?f.a+(f.b-f.a)*v/10:f.b+(f.c-f.b)*(v-10)/10;const r=Math.abs(f.x-pred)/f.noise;return sum+f.weight*(r<=1?r*r:2*r-1)},0)/features.reduce((sum,f)=>sum+f.weight,0);
+ const ranked=Array.from({length:21},(_,v)=>({v,loss:loss(v)})).sort((a,b)=>a.loss-b.loss||Math.abs(a.v-10)-Math.abs(b.v-10));
+ const best=ranked[0];if(!priority&&best.loss>9)continue;
+ const similarity=Math.round(100*Math.exp(-Math.sqrt(best.loss)/2));
+ const plausible=ranked.filter(r=>r.loss<=best.loss+1).map(r=>r.v);
+ out[noseNames[i]]={value:best.v,similarity,range:[Math.min(...plausible),Math.max(...plausible)],outside:best.v===0||best.v===20,features:features.length,low:features.length<2||best.loss>4||i===1||i===2};
  }
  return out;
 }
@@ -442,11 +447,11 @@ function renderNose(){
  noseEstimates=estimateNose();panel.replaceChildren();
  document.getElementById('noseStatus').textContent=noseTarget?`参考画像測定 ${Object.keys(noseAnchors||{}).length}/13 枚。${noseTarget.quality?'暫定推定（実機未検証）':'写真の解像度・左右差により推定保留'}`:'顔の特徴を解析してください。';
  for(const [i,name] of noseNames.entries()){
- const e=noseEstimates[name],card=document.createElement('div');card.className='metric';const label=document.createElement('span'),value=document.createElement('strong'),note=document.createElement('div');note.className='hint';label.textContent=name;value.textContent=e?`${e.value}（暫定）`:'未算出';note.textContent=e?`0・10・20の区間補間${e.outside?'／範囲外を端値に制限':''}${i===1||i===2?'／正面からの奥行き近似・低信頼':''}${gender==='MEN'?'／女性参考モデルで暫定変換':''}`:'測定前、校正不足、または特徴量の不整合';card.append(label,value,note);panel.append(card);
+ const e=noseEstimates[name],card=document.createElement('div');card.className='metric';const label=document.createElement('span'),value=document.createElement('strong'),note=document.createElement('div');note.className='hint';label.textContent=name;value.textContent=e?`${e.value}（暫定） / 近似度 ${e.similarity}%`:'未算出';note.textContent=e?`特徴量の一致度（正解率ではありません）／候補範囲 ${e.range.join("〜")}／${e.low?"低信頼／":""}0・10・20の区間補間${e.outside?'／端値候補':''}${i===1||i===2?'／正面からの奥行き近似・低信頼':''}${gender==='MEN'?'／女性参考モデルで暫定変換':''}`:'測定前、校正不足、または特徴量の不整合';card.append(label,value,note);panel.append(card);
  }
 }
 renderNose();
-document.getElementById('copyNose').onclick=async()=>{const t=noseNames.map(n=>`${n}: ${noseEstimates[n]?.value??'未算出'}`).join('\n');try{await navigator.clipboard.writeText(t);document.getElementById('noseStatus').textContent='鼻の設定値をコピーしました。'}catch(e){prompt('設定値をコピーしてください',t)}};
+document.getElementById('copyNose').onclick=async()=>{const t=noseNames.map(n=>`${n}: ${noseEstimates[n]?.value??'未算出'}${noseEstimates[n]?`（近似度 ${noseEstimates[n].similarity}%）`:''}`).join('\n');try{await navigator.clipboard.writeText(t);document.getElementById('noseStatus').textContent='鼻の設定値をコピーしました。'}catch(e){prompt('設定値をコピーしてください',t)}};
 
 renderEyeGameMapping();
 document.getElementById("copyShape").addEventListener("click",async()=>{
@@ -792,7 +797,7 @@ document.getElementById("eyeImportFile").addEventListener("change",async event=>
  }catch(e){status.textContent=`読み込み失敗：${e.message}`;}
  finally{event.target.value="";}
 });
-function payload(){return {noseGameSettings:noseNames.map(name=>({name,value:noseEstimates[name]?.value??null,status:noseEstimates[name]?"experimental_unverified":"uncalibrated"})),app:"WILDS FACE LAB",version:"0.5.20",profile:gender,hair:{type:values.hairType,lengthSetting1:values.hairLength1,lengthSetting2:values.hairLength2},hairTypeObservedRange:"0–45; reference images registered",hairLengthRangeStatus:"0–10 provisional; verify in game",faceMeasurements:measuredMetrics,shapeMeasurements:window.latestShapeMeasurements||null,eyeCalibration:eyeCalibrationMeasurements,eyeCalibrationSamples:eyeCalibrationSamples,eyeGameSettings:verifiedEyeSettings.map(([name])=>({name,value:eyeGameEstimates[name]??null,status:name in eyeGameEstimates?"experimental_unverified_interpolation":"uncalibrated"})),faceAnalysisStatus:measuredMetrics?"measured":"not_run",note:"Hair segmentation and reference matching of 46 types; interpolated lengths are experimental. Scores are not probabilities."}}
+function payload(){return {noseGameSettings:noseNames.map(name=>({name,value:noseEstimates[name]?.value??null,similarity:noseEstimates[name]?.similarity??null,candidateRange:noseEstimates[name]?.range??null,status:noseEstimates[name]?"experimental_unverified":"uncalibrated"})),app:"WILDS FACE LAB",version:"0.5.21",profile:gender,hair:{type:values.hairType,lengthSetting1:values.hairLength1,lengthSetting2:values.hairLength2},hairTypeObservedRange:"0–45; reference images registered",hairLengthRangeStatus:"0–10 provisional; verify in game",faceMeasurements:measuredMetrics,shapeMeasurements:window.latestShapeMeasurements||null,eyeCalibration:eyeCalibrationMeasurements,eyeCalibrationSamples:eyeCalibrationSamples,eyeGameSettings:verifiedEyeSettings.map(([name])=>({name,value:eyeGameEstimates[name]??null,status:name in eyeGameEstimates?"experimental_unverified_interpolation":"uncalibrated"})),faceAnalysisStatus:measuredMetrics?"measured":"not_run",note:"Hair segmentation and reference matching of 46 types; interpolated lengths are experimental. Scores are not probabilities."}}
 document.getElementById("copy").onclick=async()=>{const text=JSON.stringify(payload(),null,2);try{await navigator.clipboard.writeText(text);alert("設定メモをコピーしました")}catch(e){prompt("この内容をコピーしてください",text)}};
 document.getElementById("save").onclick=()=>{const blob=new Blob([JSON.stringify(payload(),null,2)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="wilds-face-calibration.json";a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)};
 window.addEventListener("beforeunload",()=>{if(selectedFileUrl)URL.revokeObjectURL(selectedFileUrl);if(faceLandmarker)faceLandmarker.close()});
