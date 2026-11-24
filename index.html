@@ -23,7 +23,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}.hint{color:var(--muted)
 </head>
 <body>
 <main class="wrap">
-  <header class="top"><div class="brand">WILDS / FACE LAB</div><div class="version">FACE + HAIR v0.5.25</div></header>
+  <header class="top"><div class="brand">WILDS / FACE LAB</div><div class="version">FACE + HAIR v0.5.29</div></header>
   <p class="eyebrow">FACE CONFIGURATION STUDIO</p>
   <h1>写真から<br>顔の特徴を測る。</h1>
   <p class="sub">顔写真から目・鼻・口・輪郭の位置関係を抽出する試験版です。ここで測定した特徴量を、次の段階でワイルズの実際の編集項目へ対応付けます。</p>
@@ -101,7 +101,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}.hint{color:var(--muted)
     <div class="selected-hair" style="text-align:left">
       <strong>写真から髪型を推定（実験版）</strong>
       <p class="hint">髪領域を端末内でAI分離し、全46タイプの実画像由来の形状と比較します。長さは撮影済み設定間の補間推定です。未撮影の長さは未校正です。</p>
-      <button class="btn primary" id="suggestHair" type="button" disabled>写真から候補を推定</button>
+      <label for="hairTieMode">髪の結び方（自動判定・手動補正）</label><select id="hairTieMode" style="width:100%;margin:8px 0;padding:10px"><option value="auto">自動判定</option><option value="tied">結んでいる・まとめ髪</option><option value="loose">結んでいない</option></select><p class="hint">正面から結び目が見えない場合は手動補正できます。</p><button class="btn primary" id="suggestHair" type="button" disabled>写真から候補を推定</button>
       <div class="status" id="hairSuggestStatus" role="status" aria-live="polite">顔写真を選ぶと推定できます。</div>
       <button class="btn" id="applyHair" type="button" disabled>候補を設定に反映</button>
     </div>
@@ -149,16 +149,52 @@ const definitions=[
 ];
 // Length lock calibration confirmed for types 35–41 only.
 const hairObserved={
- 35:{name:"ストレートボブ・重め前髪",lock1:false,lock2:false,examples:[[10,10],[0,10],[0,0]]},
- 36:{name:"アシンメトリーボブ・前髪",lock1:false,lock2:false,examples:[[10,10],[0,10],[0,0]]},
- 37:{name:"ツインテール・センター分け",lock1:false,lock2:false,examples:[[10,10],[0,10],[0,0]]},
- 38:{name:"斜め前髪ツインテール",lock1:true,lock2:false,examples:[[10,10],[10,0]]},
- 39:{name:"低めのツインテール",lock1:false,lock2:false,examples:[[10,10],[0,10],[0,0]]},
+ 0:{name:"スキンヘッド"},
+ 1:{name:"七三分け・立ち上げショート"},
+ 2:{name:"オールバック風ショート"},
+ 3:{name:"無造作ウェーブショート"},
+ 4:{name:"短め前髪・ベリーショート"},
+ 5:{name:"重め前髪・マッシュショート"},
+ 6:{name:"サイド刈り上げ・ショートアフロ"},
+ 7:{name:"サイド刈り上げ・編み込みアップ"},
+ 8:{name:"カーリーマッシュショート"},
+ 9:{name:"片側刈り上げ・流し前髪"},
+ 10:{name:"後ろ流し・ウェーブショート"},
+ 11:{name:"サイド刈り上げ・立ち上げショート"},
+ 12:{name:"後ろ流し・ロングヘア"},
+ 13:{name:"後ろ流し・肩丈ウェーブ"},
+ 14:{name:"サイド分け・肩丈ウェーブ"},
+ 15:{name:"ドレッドロックス・肩丈"},
+ 16:{name:"サイド分け・ウェーブボブ"},
+ 17:{name:"センター分け風・ボブ"},
+ 18:{name:"高めのお団子・後れ毛あり"},
+ 19:{name:"束感スパイキーショート"},
+ 20:{name:"フラットトップ・刈り上げ"},
+ 21:{name:"バズカット"},
+ 22:{name:"リーゼント"},
+ 23:{name:"モヒカン"},
+ 24:{name:"ボリュームアフロ"},
+ 25:{name:"斜め前髪・肩丈ストレート"},
+ 26:{name:"斜め前髪・レイヤーボブ"},
+ 27:{name:"サイド分け・レイヤーロング"},
+ 28:{name:"センター分け・ストレートロング"},
+ 29:{name:"重め前髪・ストレートロング"},
+ 30:{name:"後ろ流し・まとめ髪"},
+ 31:{name:"斜め前髪・後ろまとめ髪"},
+ 32:{name:"高めの無造作まとめ髪"},
+ 33:{name:"斜め前髪・アシンメトリーショート"},
+ 34:{name:"編み込み・後ろまとめ髪"},
+
+ 35:{name:"ロングツインテール・前髪あり",lock1:false,lock2:false,examples:[[10,10],[0,10],[0,0]]},
+ 36:{name:"前髪あり・低めの二つ結び",lock1:false,lock2:false,examples:[[10,10],[0,10],[0,0]]},
+ 37:{name:"センター分け・肩丈ウェーブヘア",lock1:false,lock2:false,examples:[[10,10],[0,10],[0,0]]},
+ 38:{name:"斜め前髪・短めツインテール",lock1:true,lock2:false,examples:[[10,10],[10,0]]},
+ 39:{name:"前髪あり・低めの二つ結び",lock1:false,lock2:false,examples:[[10,10],[0,10],[0,0]]},
  40:{name:"センター分けウェーブロング",lock1:true,lock2:false,examples:[[10,10],[10,0]]},
  41:{name:"ボリュームのあるウェーブロング",lock1:true,lock2:false,examples:[[10,10],[10,0]]},
  42:{name:"カーリーヘア",lock1:true,lock2:false,examples:[[10,10],[10,0]]},
  43:{name:"前髪ありウェーブロング",lock1:false,lock2:false,examples:[[10,10],[0,10],[0,0]]},
- 44:{name:"後ろで束ねたロングヘア",lock1:true,lock2:false,examples:[[10,10],[10,0]]},
+ 44:{name:"長め前髪・後ろで束ねたヘア",lock1:true,lock2:false,examples:[[10,10],[10,0]]},
  45:{name:"サイドポニーテール",lock1:true,lock2:false,examples:[[10,10],[10,0]]}
 };
 let values=Object.fromEntries(definitions.map(x=>[x.id,x.value]));
@@ -724,20 +760,41 @@ async function hairCandidateFromImage(image,p){
  }
  mask.close();
  if(weights.reduce((a,b)=>a+b,0)<180)throw new Error("髪全体が写る写真を使用してください。");
- const candidates=rankHairVectors(v,weights);
- return {...candidates[0],method:"hair_segmentation_reference_matching",ranking:candidates.map(c=>c.type),candidates:candidates.slice(0,5)};
+ const candidates=rankHairVectors(v,weights,document.getElementById("hairTieMode").value);
+ return {...candidates[0],method:"hair_segmentation_reference_matching",ranking:candidates.map(c=>c.type),tieLabel:candidates.tieLabel,candidates:candidates.slice(0,5)};
 }
-function rankHairVectors(v,weights){
+const tiedHairTypes=new Set([7,18,30,31,32,34,35,36,38,39,44,45]);
+const hairTieClass=t=>tiedHairTypes.has(t)?"tied":"loose";
+const hairTieText=t=>t==="tied"?"結髪・まとめ髪":"非結髪";
+// Compare regional silhouette features, including gaps and narrow tail roots.
+function hairRegionalFeatures(a,w){
+ const out=[];
+ for(const [x0,x1,y0,y1] of [[3,8,8,15],[16,21,8,15],[3,8,15,21],[16,21,15,21],[2,9,21,29],[15,22,21,29],[8,16,0,6],[5,9,12,18],[15,19,12,18],[5,9,18,25],[15,19,18,25]]){
+ let n=0,sum=0;for(let y=y0;y<y1;y++)for(let x=x0;x<x1;x++){let i=y*24+x;n+=w[i];sum+=a[i]*w[i];}out.push([n?sum/n:0,n/((x1-x0)*(y1-y0))]);
+ }return out;
+}
+function rankHairVectors(v,weights,mode="auto"){
+ const target=hairRegionalFeatures(v,weights);
+ const regional=a=>{const f=hairRegionalFeatures(a,weights);let e=0,n=0;f.forEach(([x,w],i)=>{e+=w*Math.abs(x-target[i][0]);n+=w;});return 1-e/Math.max(n,1e-9);};
  const score=(a)=>{let intersection=0,union=0,error=0,total=0;for(let i=0;i<v.length;i++){const w=weights[i]*(i<24*13?1.3:1);intersection+=w*Math.min(v[i],a[i]);union+=w*Math.max(v[i],a[i]);error+=w*Math.abs(v[i]-a[i]);total+=w;}return .65*(union?intersection/union:1)+.35*(1-error/Math.max(1,total));};
  const best=[];
  for(let t=0;t<=45;t++){
   const refs=hairReferenceVectors.filter(r=>r[0]===t);let winner=null;
-  const test=(l1,l2,a,estimated)=>{const q=score(a);if(!winner||q>winner.score)winner={type:t,length1:l1,length2:l2,score:q,estimated};};
+  const test=(l1,l2,a,estimated)=>{const shape=score(a),q=.78*shape+.22*regional(a);if(!winner||q>winner.score)winner={type:t,length1:l1,length2:l2,score:q,estimated,tieClass:hairTieClass(t)};};
   for(const r of refs)test(r[1],r[2],r[3],false);
   for(const a of refs)for(const b of refs){if(a===b||((a[1]!==b[1])===(a[2]!==b[2])))continue;for(let k=1;k<10;k++){const f=k/10;test(Math.round(a[1]*(1-f)+b[1]*f),Math.round(a[2]*(1-f)+b[2]*f),a[3].map((x,i)=>x*(1-f)+b[3][i]*f),true);}}
   if(winner){winner.length1Known=new Set(refs.map(r=>r[1])).size>1;winner.length2Known=new Set(refs.map(r=>r[2])).size>1;best.push(winner);}
  }
- return best.sort((a,b)=>b.score-a.score);
+ best.sort((a,b)=>b.score-a.score);
+ const groupScore=kind=>{const a=best.filter(c=>c.tieClass===kind).slice(0,3);return a.length ? .7*a[0].score+.3*a.reduce((n,c)=>n+c.score,0)/a.length:0;};
+ const delta=groupScore("tied")-groupScore("loose");
+ const coverage=target.slice(2,6).reduce((n,x)=>n+x[1],0)/4;
+ const auto=coverage>=.7&&Math.abs(delta)>=.045?(delta>0?"tied":"loose"):null;
+ const selected=mode==="auto"?auto:mode;
+ const ranked=mode!=="auto"?best.filter(c=>c.tieClass===mode):best.map(c=>({...c,rankScore:c.score+(selected===c.tieClass ? .045 : 0)})).sort((a,b)=>b.rankScore-a.rankScore);
+ if(mode==="auto"&&!auto&&ranked.length>1){const other=ranked.findIndex(c=>c.tieClass!==ranked[0].tieClass);if(other>1)ranked.splice(1,0,ranked.splice(other,1)[0]);}
+ ranked.tieLabel=mode!=="auto"?hairTieText(mode)+"（手動指定）":auto?hairTieText(auto)+"寄り（暫定）":"判別困難・両方の候補を表示";
+ return ranked;
 }
 document.getElementById("suggestHair").addEventListener("click",async()=>{
  const status=document.getElementById("hairSuggestStatus"),button=document.getElementById("suggestHair");
@@ -749,17 +806,17 @@ document.getElementById("suggestHair").addEventListener("click",async()=>{
   if(!result.faceLandmarks?.length)throw new Error("顔を検出できません。正面に近い写真を試してください。");
   proposedHair=await hairCandidateFromImage(preview,result.faceLandmarks[0]);
   if(!proposedHair)throw new Error("画像から候補を推定できませんでした。");
-  status.textContent=`推定候補：タイプ${proposedHair.type}（次点：${proposedHair.ranking.slice(1,3).join("・")}）。長さは候補一覧を参照してください。`; 
+  status.textContent=`結髪判定：${proposedHair.tieLabel}。推定候補：タイプ${proposedHair.type} / ${hairObserved[proposedHair.type]?.name??""}（次点：${proposedHair.ranking.slice(1,3).join("・")}）。長さは候補一覧を参照してください。`; 
   candidateOptions=proposedHair.candidates;
   const list=document.getElementById("hairCandidateList");
   list.hidden=false;
   list.replaceChildren();
   const heading=document.createElement("strong");heading.textContent="候補別の組み合わせ（実験値）";list.appendChild(heading);
-  const note=document.createElement("p");note.className="hint";note.textContent="評価点は髪領域の形状一致度で、正解確率ではありません。長さは撮影済み設定間の補間推定です。未校正の項目は反映しません。";list.appendChild(note);
+  const note=document.createElement("p");note.className="hint";note.textContent="評価点は髪領域と局所形状の一致度で、正解確率ではありません。自動判定が曖昧な場合は両分類を表示します。長さは撮影済み設定間の補間推定です。未校正の項目は反映しません。";list.appendChild(note);
   candidateOptions.forEach((c,i)=>{
    const b=document.createElement("button");b.type="button";b.className="btn";
    b.style.cssText="display:block;width:100%;text-align:left;margin:8px 0;white-space:normal";
-   b.textContent=`${i+1}位 タイプ${c.type} / 長さ1：${c.length1Known?c.length1:"未校正"} / 長さ2：${c.length2Known?c.length2:"未校正"} / 評価点 ${c.score.toFixed(3)}`;
+   b.textContent=`${i+1}位 タイプ${c.type} / ${hairObserved[c.type]?.name??""} / ${hairTieText(c.tieClass)} / 長さ1：${c.length1Known?c.length1:"未校正"} / 長さ2：${c.length2Known?c.length2:"未校正"} / 評価点 ${c.score.toFixed(3)}`;
    b.addEventListener("click",()=>{proposedHair={...proposedHair,...c};status.textContent=`タイプ${c.type}を反映候補に選択しました。設定に反映を押してください。`;});
    list.appendChild(b);
   });
@@ -767,6 +824,7 @@ document.getElementById("suggestHair").addEventListener("click",async()=>{
  }catch(e){proposedHair=null;status.textContent=e.message||"推定できませんでした。";document.getElementById("applyHair").disabled=true;}
  finally{button.disabled=false;}
 });
+document.getElementById("hairTieMode").addEventListener("change",()=>{proposedHair=null;candidateOptions=[];document.getElementById("applyHair").disabled=true;document.getElementById("hairCandidateList").hidden=true;document.getElementById("hairSuggestStatus").textContent="結び方を変更しました。再度候補を推定してください。";});
 document.getElementById("applyHair").addEventListener("click",()=>{
  if(!proposedHair)return;
  updateHairValue("hairType",proposedHair.type);
@@ -865,7 +923,7 @@ document.getElementById("eyeImportFile").addEventListener("change",async event=>
  }catch(e){status.textContent=`読み込み失敗：${e.message}`;}
  finally{event.target.value="";}
 });
-function payload(){return {mouthGameSettings:mouthNames.map(name=>({name,value:mouthEstimates[name]?.value??null,similarity:mouthEstimates[name]?.value===mouthEstimates[name]?.estimated?mouthEstimates[name]?.similarity??null:null})),noseGameSettings:noseNames.map(name=>({name,value:noseEstimates[name]?.value??null,similarity:noseEstimates[name]?.similarity??null,candidateRange:noseEstimates[name]?.range??null,status:noseEstimates[name]?"experimental_unverified":"uncalibrated"})),app:"WILDS FACE LAB",version:"0.5.25",profile:gender,hair:{type:values.hairType,lengthSetting1:values.hairLength1,lengthSetting2:values.hairLength2},hairTypeObservedRange:"0–45; reference images registered",hairLengthRangeStatus:"0–10 provisional; verify in game",faceMeasurements:measuredMetrics,shapeMeasurements:window.latestShapeMeasurements||null,eyeCalibration:eyeCalibrationMeasurements,eyeCalibrationSamples:eyeCalibrationSamples,eyeGameSettings:verifiedEyeSettings.map(([name])=>({name,value:eyeGameEstimates[name]?.value??null,similarity:eyeGameEstimates[name]?.similarity??null,candidateRange:eyeGameEstimates[name]?.range??null,lowConfidence:eyeGameEstimates[name]?.low??null,status:name in eyeGameEstimates?"experimental_unverified_interpolation":"uncalibrated"})),faceAnalysisStatus:measuredMetrics?"measured":"not_run",note:"Hair segmentation and reference matching of 46 types; interpolated lengths are experimental. Scores are not probabilities."}}
+function payload(){return {mouthGameSettings:mouthNames.map(name=>({name,value:mouthEstimates[name]?.value??null,similarity:mouthEstimates[name]?.value===mouthEstimates[name]?.estimated?mouthEstimates[name]?.similarity??null:null})),noseGameSettings:noseNames.map(name=>({name,value:noseEstimates[name]?.value??null,similarity:noseEstimates[name]?.similarity??null,candidateRange:noseEstimates[name]?.range??null,status:noseEstimates[name]?"experimental_unverified":"uncalibrated"})),app:"WILDS FACE LAB",version:"0.5.28",profile:gender,hair:{type:values.hairType,lengthSetting1:values.hairLength1,lengthSetting2:values.hairLength2},hairTypeObservedRange:"0–45; reference images registered",hairLengthRangeStatus:"0–10 provisional; verify in game",faceMeasurements:measuredMetrics,shapeMeasurements:window.latestShapeMeasurements||null,eyeCalibration:eyeCalibrationMeasurements,eyeCalibrationSamples:eyeCalibrationSamples,eyeGameSettings:verifiedEyeSettings.map(([name])=>({name,value:eyeGameEstimates[name]?.value??null,similarity:eyeGameEstimates[name]?.similarity??null,candidateRange:eyeGameEstimates[name]?.range??null,lowConfidence:eyeGameEstimates[name]?.low??null,status:name in eyeGameEstimates?"experimental_unverified_interpolation":"uncalibrated"})),faceAnalysisStatus:measuredMetrics?"measured":"not_run",note:"Hair segmentation and reference matching of 46 types; interpolated lengths are experimental. Scores are not probabilities."}}
 document.getElementById("copy").onclick=async()=>{const text=JSON.stringify(payload(),null,2);try{await navigator.clipboard.writeText(text);alert("設定メモをコピーしました")}catch(e){prompt("この内容をコピーしてください",text)}};
 document.getElementById("save").onclick=()=>{const blob=new Blob([JSON.stringify(payload(),null,2)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="wilds-face-calibration.json";a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)};
 window.addEventListener("beforeunload",()=>{if(selectedFileUrl)URL.revokeObjectURL(selectedFileUrl);if(faceLandmarker)faceLandmarker.close()});
@@ -873,7 +931,7 @@ const typeGrid=document.getElementById("hairTypeGrid");
 for(let i=0;i<=45;i++){
  const b=document.createElement("button");
  b.type="button";b.className="btn type-choice";b.dataset.type=String(i);
- b.textContent=String(i);b.setAttribute("aria-label",`髪のタイプ ${i}`);
+ b.textContent=String(i);b.title=hairObserved[i]?.name??"";b.setAttribute("aria-label",`髪のタイプ ${i}`);
  b.addEventListener("click",()=>updateHairValue("hairType",i));
  typeGrid.appendChild(b);
 }
