@@ -23,7 +23,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}.hint{color:var(--muted)
 </head>
 <body>
 <main class="wrap">
-  <header class="top"><div class="brand">WILDS / FACE LAB</div><div class="version">FACE + HAIR v0.5.43</div></header>
+  <header class="top"><div class="brand">WILDS / FACE LAB</div><div class="version">FACE + HAIR v0.5.44</div></header>
   <p class="eyebrow">FACE CONFIGURATION STUDIO</p>
   <h1>写真から<br>顔の特徴を測る。</h1>
   <p class="sub">顔写真から目・鼻・口・輪郭の位置関係を抽出する試験版です。ここで測定した特徴量を、次の段階でワイルズの実際の編集項目へ対応付けます。</p>
@@ -393,6 +393,13 @@ function measureEyeV2(p,W,H,img){
    });
    const avg=k=>(e[0][k]+e[1][k])/2;
    eyeMeasurements.push(["目の横幅（顔幅比）",avg("w")/fw*100,"%"],["目尻の傾き",e.reduce((t,v)=>t+Math.atan2(v.outer-v.inner,v.w)*180/Math.PI,0)/2,"°"],["目の中心高さ（顔高比）",((avg("outer")+avg("inner"))/2-q[10].y)/fh*100,"%"],["目頭の高さ（顔高比）",(avg("inner")-q[10].y)/fh*100,"%"],["目尻の高さ（顔高比）",(avg("outer")-q[10].y)/fh*100,"%"],["目の大きさ・開口面積近似",avg("area"),"相対値"],["上まぶたの高さ（目幅比）",avg("upper"),"%"],["下まぶたの高さ（目幅比）",avg("lower"),"%"],["上まぶたの角度",avg("ua"),"°"],["下まぶたの角度",avg("la"),"°"]);
+   const irisGaps=[];
+   for(const [center,rim,outer,inner,lid] of [[468,[469,470,471,472],33,133,145],[473,[474,475,476,477],263,362,374]]){
+     if(!q[center]||rim.some(i=>!q[i]))continue;
+     const w=distance(q[outer],q[inner]),r=Math.max(...rim.map(i=>distance(q[i],q[center])));
+     if(w>20&&r/w>.08&&r/w<.4)irisGaps.push(100*(q[lid].y-q[center].y-r)/w);
+   }
+   if(irisGaps.length===2)eyeMeasurements.push(["黒目下端と下まぶたの間隔（目幅比）",(irisGaps[0]+irisGaps[1])/2,"%"]);
    let crease=null;try{crease=measureCrease(p,W,H,img)}catch(e){console.warn('Crease measurement failed',e)}
    if(crease){eyeMeasurements.push(["二重折り目の幅（目幅比）",crease.width,"%"],["二重折り目の角度",crease.angle,"°"]);}
    const quality=Math.min(e[0].w,e[1].w)/Math.max(e[0].w,e[1].w)>=0.72 && Math.min(e[0].w,e[1].w)>=35 && Math.min(e[0].opening,e[1].opening)>7;
@@ -437,7 +444,7 @@ const eyeRelated={
  "目尻の高さ":["目尻の傾き","目の中心高さ（顔高比）"],
  "上まぶたの高さ":["目の大きさ・開口面積近似","上まぶたの角度"],
  "上まぶたの角度":["上まぶたの高さ（目幅比）"],
- "下まぶたの高さ":["目の大きさ・開口面積近似","下まぶたの角度"],
+ "下まぶたの高さ":["黒目下端と下まぶたの間隔（目幅比）","目の大きさ・開口面積近似","下まぶたの角度"],
  "下まぶたの角度":["下まぶたの高さ（目幅比）"]
 };
 function estimateEyeGameValue(item){
@@ -853,7 +860,7 @@ async function hairCandidateFromImage(image,p){
  return {...candidates[0],method:"hair_segmentation_reference_matching",ranking:candidates.map(c=>c.type),tieLabel:candidates.tieLabel,candidates:candidates.slice(0,5)};
 }
 const tiedHairTypes=new Set([7,18,30,31,32,34,35,36,38,39,44,45]);
-const hairTieClass=t=>tiedHairTypes.has(t)?"tied":"loose";
+const hairTieClass=(t,l1,l2)=>t===35&&l2===0?"loose":tiedHairTypes.has(t)?"tied":"loose";
 const hairTieText=t=>t==="tied"?"結髪・まとめ髪":"非結髪";
 // Compare regional silhouette features, including gaps and narrow tail roots.
 function hairRegionalFeatures(a,w){
@@ -882,9 +889,12 @@ function rankHairVectors(v,weights,mode="auto"){
  const best=[];
  for(let t=0;t<=45;t++){
   const refs=hairReferenceVectors.filter(r=>r[0]===t);let winner=null;
-  const test=(l1,l2,a,estimated)=>{const shape=score(a),base=.78*shape+.22*regional(a),edge=hairEdgeSimilarity(v,a,weights),q=edge===null?base:.82*base+.18*edge;if(!winner||q>winner.score)winner={type:t,length1:l1,length2:l2,score:q,estimated,tieClass:hairTieClass(t)};};
+  const test=(l1,l2,a,estimated)=>{if(mode!=="auto"&&hairTieClass(t,l1,l2)!==mode)return;const shape=score(a),base=.78*shape+.22*regional(a),edge=hairEdgeSimilarity(v,a,weights),q=edge===null?base:.82*base+.18*edge;if(!winner||q>winner.score)winner={type:t,length1:l1,length2:l2,score:q,estimated,tieClass:hairTieClass(t,l1,l2)};};
   for(const r of refs)test(r[1],r[2],r[3],false);
   for(const a of refs)for(const b of refs){if(a===b||((a[1]!==b[1])===(a[2]!==b[2])))continue;for(let k=1;k<10;k++){const f=k/10;test(Math.round(a[1]*(1-f)+b[1]*f),Math.round(a[2]*(1-f)+b[2]*f),a[3].map((x,i)=>x*(1-f)+b[3][i]*f),true);}}
+  // Type 35, length 2 = 0 was observed to look like loose bob at length 1 = 7.
+  // Estimate missing corner from the three existing reference anchors, not a fixed photo recipe.
+  if(t===35){const a=refs.find(r=>r[1]===10&&r[2]===10),b=refs.find(r=>r[1]===0&&r[2]===10),c=refs.find(r=>r[1]===0&&r[2]===0);if(a&&b&&c)for(let l=1;l<=10;l++)test(l,0,c[3].map((x,i)=>Math.max(0,Math.min(1,x+(a[3][i]-b[3][i])*l/10))),true);}
   if(winner){winner.length1Known=new Set(refs.map(r=>r[1])).size>1;winner.length2Known=new Set(refs.map(r=>r[2])).size>1;best.push(winner);}
  }
  best.sort((a,b)=>b.score-a.score);
@@ -1044,5 +1054,6 @@ for(let i=0;i<=45;i++){
 
 render();
 </script>
+<script type="application/json" id="user-calibration-example-20261125">{"status": "user-tested example; not a universal default or fitted training sample", "hair": [35, 7, 0], "eyeBlend": [3, 4, 30, 70], "eye": [11, 10, 5, 20, 10, 10, 0, 10, 0, 6, 5, 10, 4], "noseBlend": [1, 5, 0, 100], "nose": [4, 0, 10, 8, 0, 9], "mouthBlend": [4, 8, 70, 30], "mouth": [13, 6, 10, 13, 5], "contourBlend": [4, 5, 60, 40], "contour": [10, 9, 9, 8, 3, 10, 7, 3]}</script>
 </body>
 </html>
